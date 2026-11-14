@@ -1,6 +1,5 @@
 use bytemuck::cast_slice_mut;
 
-use crate::config::{CloseKey, close_key_label};
 use crate::state::{
     ActiveAnnotation, AnnotationItem, AnnotationPoint, AnnotationShapeKind, BadgeModel,
     ShapeAnnotation, StrokeAnnotation, TextAnnotation,
@@ -622,12 +621,7 @@ fn help_section_height((_, entries): &HelpSection) -> usize {
     HELP_HEADING_HEIGHT + HELP_ROW_GAP * 2 + entries.len() * (HELP_ROW_HEIGHT + HELP_ROW_GAP)
 }
 
-pub fn paint_help_overlay(
-    pixels: &mut [u8],
-    width: usize,
-    height: usize,
-    close_key: Option<CloseKey>,
-) {
+pub fn paint_help_overlay(pixels: &mut [u8], width: usize, height: usize, close_label: &str) {
     let mut canvas = Canvas::new(pixels, width, height);
     canvas.pixels.fill(0xCC10_1018);
 
@@ -680,7 +674,7 @@ pub fn paint_help_overlay(
         }
     }
 
-    let footer_text = format!("Press ? or {} to close", close_key_label(close_key));
+    let footer_text = format!("Press ? or {close_label} to close");
     let footer_w = footer_text.len() * TEXT_GLYPH_ADVANCE * HELP_TEXT_SCALE;
     let footer_x = card_x + (card_w.saturating_sub(footer_w)) / 2;
     let footer_y = card_y + card_h - footer_h;
@@ -798,8 +792,10 @@ mod tests {
         Canvas::new(&mut pixels, 4, 4).fill_rect(2, 2, 4, 4, 0xFFFF_FFFF);
 
         let painted = pixels
-            .chunks_exact(4)
-            .filter(|chunk| *chunk == 0xFFFF_FFFF_u32.to_ne_bytes())
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .filter(|chunk| **chunk == 0xFFFF_FFFF_u32.to_ne_bytes())
             .count();
 
         assert_eq!(painted, 4);
@@ -839,7 +835,13 @@ mod tests {
             },
         );
 
-        assert!(pixels.chunks_exact(4).any(|chunk| chunk != [0, 0, 0, 0]));
+        assert!(
+            pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|chunk| *chunk != [0, 0, 0, 0])
+        );
     }
 
     #[test]
@@ -863,7 +865,13 @@ mod tests {
             },
         );
 
-        assert!(pixels.chunks_exact(4).any(|chunk| chunk != [0, 0, 0, 0]));
+        assert!(
+            pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|chunk| *chunk != [0, 0, 0, 0])
+        );
     }
 
     #[test]
@@ -883,7 +891,13 @@ mod tests {
             },
         );
 
-        assert!(pixels.chunks_exact(4).any(|chunk| chunk != [0, 0, 0, 0]));
+        assert!(
+            pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|chunk| *chunk != [0, 0, 0, 0])
+        );
     }
 
     #[test]
@@ -926,7 +940,13 @@ mod tests {
             },
         );
 
-        assert!(pixels.chunks_exact(4).any(|chunk| chunk != [0, 0, 0, 0]));
+        assert!(
+            pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|chunk| *chunk != [0, 0, 0, 0])
+        );
     }
 
     #[test]
@@ -941,7 +961,13 @@ mod tests {
             "File saved to shot.png",
         );
 
-        assert!(pixels.chunks_exact(4).any(|chunk| chunk != [0, 0, 0, 0]));
+        assert!(
+            pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|chunk| *chunk != [0, 0, 0, 0])
+        );
     }
 
     #[test]
@@ -950,7 +976,13 @@ mod tests {
 
         paint_color_picker(&mut pixels, 320, 112, 0xFF12_34AB, "#1234AB", true);
 
-        assert!(pixels.chunks_exact(4).any(|chunk| chunk != [0, 0, 0, 0]));
+        assert!(
+            pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|chunk| *chunk != [0, 0, 0, 0])
+        );
         assert!(lookup_glyph('#').is_some());
     }
 
@@ -974,7 +1006,13 @@ mod tests {
             },
         );
 
-        assert!(pixels.chunks_exact(4).any(|chunk| chunk != [0, 0, 0, 0]));
+        assert!(
+            pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|chunk| *chunk != [0, 0, 0, 0])
+        );
     }
 
     #[test]
@@ -997,7 +1035,13 @@ mod tests {
             },
         );
 
-        assert!(pixels.chunks_exact(4).any(|chunk| chunk != [0, 0, 0, 0]));
+        assert!(
+            pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|chunk| *chunk != [0, 0, 0, 0])
+        );
         assert!(lookup_glyph('h').is_some());
         assert!(lookup_glyph('!').is_some());
     }

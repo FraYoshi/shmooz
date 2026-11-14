@@ -9,7 +9,9 @@ use wayland_client::{
 use xkbcommon::xkb;
 
 use crate::{
-    clipboard, overlay, screenshot,
+    clipboard,
+    keymap::KeyAction,
+    overlay, screenshot,
     state::{
         ActiveAnnotation, ActiveMove, AnnotationPoint, AnnotationTool, AppState, InteractionMode,
         KeyboardTextState, REPEAT_INTERVAL, TextAnnotation,
@@ -70,13 +72,6 @@ const KEY_C: u32 = 46;
 const KEY_DOT: u32 = 52;
 const KEY_SLASH: u32 = 53;
 const KEY_SPACE: u32 = 57;
-const KEY_KPMINUS: u32 = 74;
-const KEY_KPPLUS: u32 = 78;
-const KEY_KP0: u32 = 82;
-const KEY_UP: u32 = 103;
-const KEY_LEFT: u32 = 105;
-const KEY_RIGHT: u32 = 106;
-const KEY_DOWN: u32 = 108;
 
 const DOUBLE_CLICK_TIME_MS: u32 = 400;
 const KEYBOARD_PAN_STEP: f64 = 50.0;
@@ -103,7 +98,9 @@ pub fn repeat_timer_tick(state: &mut AppState) {
         return;
     }
 
-    handle_key_action(state, key);
+    if let Some(action) = state.config.key_action(key) {
+        apply_key_action(state, action);
+    }
     state.repeat_deadline = Some(Instant::now() + REPEAT_INTERVAL);
 }
 
@@ -477,7 +474,7 @@ fn handle_key_event(state: &mut AppState, key: u32, key_state: wl_keyboard::KeyS
     }
 
     if state.interaction_mode == InteractionMode::ColorPicker {
-        if key == KEY_I {
+        if state.config.key_action(key) == Some(KeyAction::ToggleColorPicker) {
             toggle_color_picker_mode(state);
         }
         return;
@@ -492,11 +489,7 @@ fn handle_key_event(state: &mut AppState, key: u32, key_state: wl_keyboard::KeyS
         return;
     }
 
-    if state
-        .config
-        .close_key
-        .is_some_and(|close_key| close_key.key_code() == key)
-    {
+    if state.config.key_action(key) == Some(KeyAction::Close) {
         state.request_exit();
         return;
     }
@@ -506,7 +499,7 @@ fn handle_key_event(state: &mut AppState, key: u32, key_state: wl_keyboard::KeyS
         return;
     }
 
-    if key == KEY_I {
+    if state.config.key_action(key) == Some(KeyAction::ToggleColorPicker) {
         toggle_color_picker_mode(state);
         return;
     }
@@ -515,44 +508,11 @@ fn handle_key_event(state: &mut AppState, key: u32, key_state: wl_keyboard::KeyS
         return;
     }
 
-    match key {
-        KEY_ESC if state.config.close_key.is_none() => state.request_exit(),
-        KEY_D => toggle_annotation_mode(state, InteractionMode::AnnotateZoomed),
-        KEY_W => toggle_annotation_mode(state, InteractionMode::AnnotateUnzoomed),
-        KEY_P => select_annotation_tool(state, AnnotationTool::Pen),
-        KEY_H => select_annotation_tool(state, AnnotationTool::Highlighter),
-        KEY_L => select_annotation_tool(state, AnnotationTool::Line),
-        KEY_M if state.interaction_mode.is_annotating() => {
-            toggle_tool_override(state, AnnotationTool::Move)
-        }
-        KEY_T if state.interaction_mode.is_annotating() => {
-            toggle_tool_override(state, AnnotationTool::Text)
-        }
-        KEY_R => select_annotation_tool(state, AnnotationTool::Rectangle),
-        KEY_E => select_annotation_tool(state, AnnotationTool::Ellipse),
-        KEY_U => undo_annotation(state),
-        KEY_C => clear_annotations(state),
-        KEY_0 | KEY_KP0 if !state.interaction_mode.is_annotating() => restore_focused_window(state),
-        KEY_S => {
-            if let Some(output_id) = active_window_id(state) {
-                match screenshot::save_output(state, output_id) {
-                    Ok(path) => {
-                        overlay::show_toast(state, output_id, screenshot_toast_message(&path));
-                    }
-                    Err(err) => state.record_fatal(err),
-                }
-            }
-        }
-        KEY_F => {
-            state.spotlight_enabled = !state.spotlight_enabled;
-            overlay::update_spotlight_overlays(state);
-        }
-        _ => {
-            handle_key_action(state, key);
-            if !state.interaction_mode.is_annotating() && is_repeatable_key(key) {
-                state.repeat_key = Some(key);
-                state.repeat_deadline = Some(Instant::now() + KEY_REPEAT_DELAY);
-            }
+    if let Some(action) = state.config.key_action(key) {
+        apply_key_action(state, action);
+        if !state.interaction_mode.is_annotating() && action.is_repeatable() {
+            state.repeat_key = Some(key);
+            state.repeat_deadline = Some(Instant::now() + KEY_REPEAT_DELAY);
         }
     }
 }
@@ -610,44 +570,90 @@ fn copy_color_to_clipboard(state: &mut AppState, serial: u32) {
     }
 }
 
-fn handle_key_action(state: &mut AppState, key: u32) {
-    if state.interaction_mode.is_annotating() {
-        match key {
-            KEY_LEFTBRACE => adjust_annotation_text_scale(state, -1),
-            KEY_RIGHTBRACE => adjust_annotation_text_scale(state, 1),
-            _ => {}
-        }
-        return;
-    }
+fn apply_key_action(state: &mut AppState, action: KeyAction) {
+    let annotating = state.interaction_mode.is_annotating();
 
-    match key {
-        KEY_LEFTBRACE => {
-            adjust_spotlight_radius(state, -0.05);
-            return;
+    match action {
+        KeyAction::Close => state.request_exit(),
+        KeyAction::ToggleColorPicker => toggle_color_picker_mode(state),
+        KeyAction::SaveScreenshot => save_screenshot(state),
+        KeyAction::ToggleSpotlight => {
+            state.spotlight_enabled = !state.spotlight_enabled;
+            overlay::update_spotlight_overlays(state);
         }
-        KEY_RIGHTBRACE => {
-            adjust_spotlight_radius(state, 0.05);
-            return;
+        KeyAction::ToggleAnnotateZoomed => {
+            toggle_annotation_mode(state, InteractionMode::AnnotateZoomed)
         }
-        _ => {}
+        KeyAction::ToggleAnnotateUnzoomed => {
+            toggle_annotation_mode(state, InteractionMode::AnnotateUnzoomed)
+        }
+        KeyAction::ToolPen => select_annotation_tool(state, AnnotationTool::Pen),
+        KeyAction::ToolHighlighter => select_annotation_tool(state, AnnotationTool::Highlighter),
+        KeyAction::ToolLine => select_annotation_tool(state, AnnotationTool::Line),
+        KeyAction::ToolRectangle => select_annotation_tool(state, AnnotationTool::Rectangle),
+        KeyAction::ToolEllipse => select_annotation_tool(state, AnnotationTool::Ellipse),
+        KeyAction::ToolMove if annotating => toggle_tool_override(state, AnnotationTool::Move),
+        KeyAction::ToolText if annotating => toggle_tool_override(state, AnnotationTool::Text),
+        KeyAction::ToolMove | KeyAction::ToolText => {}
+        KeyAction::UndoAnnotation => undo_annotation(state),
+        KeyAction::ClearAnnotations => clear_annotations(state),
+        KeyAction::DecreaseSize if annotating => adjust_annotation_text_scale(state, -1),
+        KeyAction::IncreaseSize if annotating => adjust_annotation_text_scale(state, 1),
+        KeyAction::ZoomIn
+        | KeyAction::ZoomOut
+        | KeyAction::PanLeft
+        | KeyAction::PanRight
+        | KeyAction::PanUp
+        | KeyAction::PanDown
+        | KeyAction::DecreaseSize
+        | KeyAction::IncreaseSize
+        | KeyAction::ResetView => {
+            if !annotating {
+                apply_navigation_action(state, action);
+            }
+        }
+    }
+}
+
+fn apply_navigation_action(state: &mut AppState, action: KeyAction) {
+    if matches!(action, KeyAction::DecreaseSize | KeyAction::IncreaseSize) {
+        let delta = if action == KeyAction::DecreaseSize {
+            -0.05
+        } else {
+            0.05
+        };
+        adjust_spotlight_radius(state, delta);
+        return;
     }
 
     let Some(output_id) = state.focused_window else {
         return;
     };
 
-    match key {
-        KEY_EQUAL | KEY_KPPLUS => {
+    match action {
+        KeyAction::ZoomIn => {
             zoom_focused_window_at_center(state, output_id, KEYBOARD_ZOOM_IN_FACTOR);
         }
-        KEY_MINUS | KEY_KPMINUS => {
+        KeyAction::ZoomOut => {
             zoom_focused_window_at_center(state, output_id, KEYBOARD_ZOOM_OUT_FACTOR);
         }
-        KEY_LEFT => pan_focused_window(state, output_id, -KEYBOARD_PAN_STEP, 0.0),
-        KEY_RIGHT => pan_focused_window(state, output_id, KEYBOARD_PAN_STEP, 0.0),
-        KEY_UP => pan_focused_window(state, output_id, 0.0, -KEYBOARD_PAN_STEP),
-        KEY_DOWN => pan_focused_window(state, output_id, 0.0, KEYBOARD_PAN_STEP),
+        KeyAction::PanLeft => pan_focused_window(state, output_id, -KEYBOARD_PAN_STEP, 0.0),
+        KeyAction::PanRight => pan_focused_window(state, output_id, KEYBOARD_PAN_STEP, 0.0),
+        KeyAction::PanUp => pan_focused_window(state, output_id, 0.0, -KEYBOARD_PAN_STEP),
+        KeyAction::PanDown => pan_focused_window(state, output_id, 0.0, KEYBOARD_PAN_STEP),
+        KeyAction::ResetView => restore_focused_window(state),
         _ => {}
+    }
+}
+
+fn save_screenshot(state: &mut AppState) {
+    let Some(output_id) = active_window_id(state) else {
+        return;
+    };
+
+    match screenshot::save_output(state, output_id) {
+        Ok(path) => overlay::show_toast(state, output_id, screenshot_toast_message(&path)),
+        Err(err) => state.record_fatal(err),
     }
 }
 
@@ -1223,22 +1229,6 @@ fn adjust_annotation_text_scale(state: &mut AppState, delta: i32) {
     overlay::refresh_zoom_badge_overlays(state);
 }
 
-fn is_repeatable_key(key: u32) -> bool {
-    matches!(
-        key,
-        KEY_EQUAL
-            | KEY_KPPLUS
-            | KEY_MINUS
-            | KEY_KPMINUS
-            | KEY_LEFT
-            | KEY_RIGHT
-            | KEY_UP
-            | KEY_DOWN
-            | KEY_LEFTBRACE
-            | KEY_RIGHTBRACE
-    )
-}
-
 fn logical_size(state: &AppState, output_id: u32) -> Size {
     state
         .outputs
@@ -1296,27 +1286,23 @@ fn screen_to_annotation_point(state: &AppState, output_id: u32, x: f64, y: f64) 
 }
 
 #[cfg(test)]
+// keyboard helpers below this test module
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use wayland_client::protocol::wl_keyboard;
     use xkbcommon::xkb;
 
     use crate::{
-        config::{CloseKey, Config, test_config},
+        config::test_config,
         state::{ANNOTATION_COLOR_PALETTE, ActiveAnnotation, DEFAULT_TEXT_ANNOTATION_SCALE},
     };
 
     use super::{
         AnnotationPoint, AnnotationTool, AppState, InteractionMode, KEY_1, KEY_3, KEY_C, KEY_ESC,
-        KEY_L, KEY_M, KEY_RIGHTBRACE, KEY_T, apply_annotation_palette_index, ctrl_modifier_active,
-        current_text_input, handle_key_event, is_copy_screenshot_shortcut, select_annotation_tool,
+        KEY_I, KEY_L, KEY_M, KEY_RIGHTBRACE, KEY_T, apply_annotation_palette_index,
+        ctrl_modifier_active, current_text_input, handle_key_event, is_copy_screenshot_shortcut,
+        select_annotation_tool,
     };
-
-    fn test_config_with_close_key(close_key: CloseKey) -> Config {
-        Config {
-            close_key: Some(close_key),
-            ..test_config()
-        }
-    }
 
     fn ctrl_pressed_state() -> AppState {
         let mut state = AppState::new(test_config());
@@ -1414,7 +1400,7 @@ mod tests {
 
     #[test]
     fn explicit_escape_close_key_keeps_escape_backing_out_of_annotation() {
-        let mut state = AppState::new(test_config_with_close_key(CloseKey::Escape));
+        let mut state = AppState::new(test_config());
         state.interaction_mode = InteractionMode::AnnotateZoomed;
         state.annotation_tool = AnnotationTool::Line;
         state.tool_override = Some(AnnotationTool::Move);
@@ -1428,6 +1414,34 @@ mod tests {
 
         assert_eq!(state.interaction_mode, InteractionMode::Navigate);
         assert_eq!(state.tool_override, None);
+    }
+
+    #[test]
+    fn remapped_toggle_color_picker_key_replaces_default() {
+        let mut config = test_config();
+        config
+            .keybindings
+            .insert(crate::keymap::KeyAction::ToggleColorPicker, vec![47]);
+        let mut state = AppState::new(config);
+
+        handle_key_event(&mut state, KEY_I, wl_keyboard::KeyState::Pressed, 0);
+        assert_eq!(state.interaction_mode, InteractionMode::Navigate);
+
+        handle_key_event(&mut state, 47, wl_keyboard::KeyState::Pressed, 0);
+        assert_eq!(state.interaction_mode, InteractionMode::ColorPicker);
+    }
+
+    #[test]
+    fn remapped_navigation_key_rearms_auto_repeat() {
+        let mut config = test_config();
+        config
+            .keybindings
+            .insert(crate::keymap::KeyAction::ZoomIn, vec![47]);
+        let mut state = AppState::new(config);
+
+        handle_key_event(&mut state, 47, wl_keyboard::KeyState::Pressed, 0);
+
+        assert_eq!(state.repeat_key, Some(47));
     }
 
     #[test]

@@ -387,7 +387,7 @@ fn refresh_zoom_badge_overlay(state: &mut AppState, output_id: u32) {
         state.effective_annotation_tool(),
         state.selected_palette_color(),
         state.text_annotation_scale,
-        state.config.close_key,
+        state.config.close_label(),
         spotlight_radius_pct,
     );
 
@@ -459,9 +459,9 @@ fn update_help_overlay(state: &mut AppState, output_id: u32) {
     let show = state.help_visible;
     set_layer_visible(state, output_id, Layer::Help, show);
     if show {
-        let close_key = state.config.close_key;
+        let close_label = state.config.close_label();
         paint_layer(state, output_id, Layer::Help, |pixels, width, height| {
-            render::paint_help_overlay(pixels, width, height, close_key);
+            render::paint_help_overlay(pixels, width, height, &close_label);
         });
     }
 }

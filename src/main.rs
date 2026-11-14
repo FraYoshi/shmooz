@@ -5,6 +5,7 @@ mod clipboard;
 mod config;
 mod error;
 mod input;
+mod keymap;
 mod output;
 mod overlay;
 mod render;

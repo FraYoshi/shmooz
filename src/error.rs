@@ -54,8 +54,33 @@ pub enum AppError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ConfigError {
-    #[error("invalid key name: {value} (supported: Esc, q, x)")]
+    #[error("invalid close key name: {value}")]
     CloseKey { value: String },
+
+    #[error("config file not found: {path}")]
+    ConfigFileMissing { path: String },
+
+    #[error("failed to read config file {path}: {message}")]
+    ConfigFileRead { path: String, message: String },
+
+    #[error("failed to parse config file {path}: {message}")]
+    ConfigFileParse { path: String, message: String },
+
+    #[error("unknown config option '{value}' in {path}")]
+    UnknownConfigKey { path: String, value: String },
+
+    #[error("unknown keybinding action: {value} (known actions: {known})")]
+    KeyBindingAction { value: String, known: String },
+
+    #[error("invalid key name '{value}' for action '{action}'")]
+    KeyBindingKey { action: String, value: String },
+
+    #[error("invalid keybinding '{key}' in {path}: {value}")]
+    KeyBindingValue {
+        path: String,
+        key: String,
+        value: String,
+    },
 
     #[error("invalid zoom percentage: {value} (must be 0-99%)")]
     Zoom { value: String },

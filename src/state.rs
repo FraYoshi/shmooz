@@ -26,7 +26,7 @@ use wayland_protocols_wlr::{
 use xkbcommon::xkb;
 
 use crate::{
-    config::{CloseKey, Config, close_key_label},
+    config::Config,
     error::{AppError, Result},
     output::{OutputState, output_matches_filter},
     render::{TEXT_GLYPH_ADVANCE, TEXT_GLYPH_HEIGHT},
@@ -53,7 +53,7 @@ impl InteractionMode {
         tool: AnnotationTool,
         annotation_color: u32,
         text_scale: usize,
-        close_key: Option<CloseKey>,
+        close_label: String,
         spotlight_radius_pct: Option<u32>,
     ) -> BadgeModel {
         let text_height = text_scale.max(1) * TEXT_GLYPH_HEIGHT;
@@ -71,10 +71,7 @@ impl InteractionMode {
                         BadgeLine::new("VIEW", "+/- zoom  arrows pan  0 reset", 0xFFF4_F4F4),
                         BadgeLine::new(
                             "OTHER",
-                            format!(
-                                "S save  Ctrl+C  ? help  {} close",
-                                close_key_label(close_key)
-                            ),
+                            format!("S save  Ctrl+C  ? help  {close_label} close"),
                             0xFFF4_F4F4,
                         ),
                     ],
@@ -803,7 +800,7 @@ fn premultiply_alpha(color: u32, alpha: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{CloseKey, test_config};
+    use crate::config::test_config;
 
     use super::{
         ANNOTATION_COLOR_PALETTE, ActiveAnnotation, AnnotationItem, AnnotationPoint,
@@ -911,7 +908,7 @@ mod tests {
             AnnotationTool::Pen,
             ANNOTATION_COLOR_PALETTE[0],
             4,
-            None,
+            String::from("Esc"),
             None,
         );
 
@@ -926,7 +923,7 @@ mod tests {
             AnnotationTool::Pen,
             ANNOTATION_COLOR_PALETTE[0],
             4,
-            Some(CloseKey::Q),
+            String::from("Q"),
             None,
         );
 
@@ -939,7 +936,7 @@ mod tests {
             AnnotationTool::Pen,
             ANNOTATION_COLOR_PALETTE[0],
             4,
-            None,
+            String::from("Esc"),
             None,
         );
 

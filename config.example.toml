@@ -1,0 +1,30 @@
+# shmooz — Dvorak left half (ortho 4x6 + thumb). Values name the key as your
+# firmware sends it; comments say what the cap prints.
+
+[keybindings]
+close            = ["'", "esc"]  # apostrophe or your Esc column
+pan_left         = "j"
+pan_right        = "k"
+pan_up           = "u"
+pan_down         = "x"   # bottom-right x
+
+zoom_in          = "p"   # plus
+zoom_out         = ","   # comma minus
+reset_view       = "."   # dot = origin
+
+save_screenshot  = "y"   # yes-save
+toggle_spotlight = "space"     # thumb space
+toggle_color_picker = ";"      # semicolon: hex colors
+toggle_annotate_zoomed = "e"
+toggle_annotate_unzoomed = "a"
+
+undo_annotation  = "o"   # oops
+clear_annotations = "i"
+
+# tools by number row (digits are reserved for the color palette while
+# annotating; move/text stay on their defaults)
+tool_pen = "1"
+tool_highlighter = "2"
+tool_line = "3"
+tool_rectangle = "4"
+tool_ellipse = "5"

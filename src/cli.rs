@@ -56,9 +56,16 @@ pub struct Cli {
     #[arg(
         long = "map-close",
         value_name = "KEY",
-        help = "Set key to close (e.g., 'Esc', 'q', 'x')"
+        help = "Set key to close (XKB-style key name, e.g., 'Escape', 'q', 'x')"
     )]
     pub map_close: Option<String>,
+
+    #[arg(
+        long = "config",
+        value_name = "PATH",
+        help = "Config file path (default: $XDG_CONFIG_HOME/shmooz/config.toml)"
+    )]
+    pub config: Option<String>,
 
     #[arg(
         long = "output",

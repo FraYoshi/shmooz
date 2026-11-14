@@ -122,6 +122,52 @@ Example sway binding:
 bindsym $super+Control+Backspace exec pgrep shmooz && killall shmooz || shmooz --zoom-in 10% --output "$(swaymsg -t get_outputs | jq -r 'map(select(.focused == true)) | .[].name')"
 ```
 
+### Custom keybindings
+
+Keybindings are configurable through a TOML config file. `shmooz` reads
+`${XDG_CONFIG_HOME}/shmooz/config.toml` (`${HOME}/.config/shmooz/config.toml` when the
+environment variable is unset); a different location can be passed with
+`--config PATH`. Options live in a `[keybindings]` table, one action per line,
+with a key name or an array of key names:
+
+```toml
+[keybindings]
+close = "q"                # exit with Q instead of Esc
+zoom_in = ["equal", "kpadd"]   # zoom in with = or KP_Add
+pan_up = ["k"]
+reset_view = []            # unbind the 0 / KP_0 reset shortcut
+```
+
+Available actions:
+
+- `close`, `zoom_in`, `zoom_out`, `pan_left`, `pan_right`, `pan_up`, `pan_down`,
+  `reset_view`, `save_screenshot`, `toggle_spotlight`, `toggle_color_picker`
+- `toggle_annotate_zoomed`, `toggle_annotate_unzoomed`, `tool_pen`,
+  `tool_highlighter`, `tool_line`, `tool_rectangle`, `tool_ellipse`,
+  `tool_move`, `tool_text`, `undo_annotation`, `clear_annotations`
+- `decrease_size`, `increase_size` (annotation text size while annotating,
+  spotlight radius while navigating)
+
+Key names follow lowercase XKB-style names: `q`, `1`, `esc`, `minus`, `equal`,
+`bracketleft` (or `[`), `kp_add` (or `kpplus`), `page_up`, `f12`, `space`.
+Case, hyphens, and underscores are ignored, so `KP_Add`, `kp-add` and `kp_add`
+are the same key. Assigning a key that is already used by another action
+simply wins over the older binding; a key can be given to several actions or
+several keys to one action.
+
+Key values address the physical position on a QWERTY-labeled keyboard (the
+raw event codes shmooz receives) — useful for layout variants like Dvorak or
+ortho boards, where the printed letter differs. See the left-hand Dvorak map in
+[`config.example.toml`](config.example.toml).
+
+Navigation controls (zoom, pan, spotlight radius) repeat while held; other
+actions trigger once per key press.
+
+Hard-wired keys that cannot be remapped: `Shift+/` toggles the help overlay,
+`Esc` closes the help overlay or backs out of color picking / annotation,
+`Ctrl+C` copies the screenshot, and the `1`–`9` / `0` color palette selection
+plus `Enter`, `Backspace`, `[` and `]` keys while annotating text.
+
 ## Build
 
 ```sh
