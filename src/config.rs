@@ -435,6 +435,19 @@ close = "nope"
     }
 
     #[test]
+    fn example_config_shipped_with_repo_is_valid_and_binds_close() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config.example.toml");
+        let mut keybindings = keymap::default_bindings();
+        merge_keybindings_file(&path, &mut keybindings).expect("config.example.toml must parse");
+
+        // The example closes with apostrophe-or-Esc and pans on the Dvorak row.
+        let apostrophe = keymap::key_code("'").unwrap();
+        assert_eq!(keybindings[&KeyAction::Close], vec![apostrophe, 1]);
+        let j = keymap::key_code("j").unwrap();
+        assert_eq!(keybindings[&KeyAction::PanLeft], vec![j]); // home-row j
+    }
+
+    #[test]
     fn merge_keybindings_rejects_unknown_option() {
         let err = bindings_err("not_a_real_option = \"up\"");
         assert!(matches!(err, ConfigError::UnknownConfigKey { .. }));
