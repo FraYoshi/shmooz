@@ -9,13 +9,32 @@ pub const DEFAULT_SCREENSHOT_DIR: &str = "~/Desktop/Screenshots";
 pub const CONFIG_DIRECTORY_ENV: &str = "XDG_CONFIG_HOME";
 pub const CONFIG_SUBPATH: &str = "shmooz/config.toml";
 pub const KEYBINDINGS_SECTION: &str = "keybindings";
+pub const SCROLL_DIRECTION_OPTION: &str = "scroll_direction";
+
+/// Which way the wheel must be pushed for a zoom in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ScrollDirection {
+    #[default]
+    Down,
+    Up,
+}
+
+impl ScrollDirection {
+    fn parse(raw: &str) -> Option<Self> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "down" => Some(Self::Down),
+            "up" => Some(Self::Up),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Config {
     pub keybindings: BTreeMap<KeyAction, Vec<u32>>,
     pub initial_zoom: f64,
     pub output_filter: Option<String>,
-    pub invert_scroll: bool,
+    pub scroll_direction: ScrollDirection,
     pub spotlight: bool,
     pub screenshot_dir: PathBuf,
     pub show_indicator: bool,
@@ -61,9 +80,10 @@ impl TryFrom<Cli> for Config {
         )?;
 
         let mut keybindings = keymap::default_bindings();
+        let mut file_scroll = None;
         if let Some(path) = config_path(cli.config.as_deref()) {
             if path.is_file() {
-                merge_keybindings_file(&path, &mut keybindings)?;
+                file_scroll = merge_keybindings_file(&path, &mut keybindings)?;
             } else if cli.config.is_some() {
                 return Err(ConfigError::ConfigFileMissing {
                     path: path.display().to_string(),
@@ -78,11 +98,18 @@ impl TryFrom<Cli> for Config {
             keybindings.insert(KeyAction::Close, vec![code]);
         }
 
+        let scroll_direction = match (&cli.scroll_direction, cli.invert_scroll) {
+            (Some(raw), _) => ScrollDirection::parse(raw)
+                .ok_or_else(|| ConfigError::InvalidScrollDirection { value: raw.clone() })?,
+            (None, true) => ScrollDirection::Up,
+            (None, false) => file_scroll.unwrap_or_default(),
+        };
+
         Ok(Self {
             keybindings,
             initial_zoom,
             output_filter: cli.output,
-            invert_scroll: cli.invert_scroll,
+            scroll_direction,
             spotlight: cli.spotlight,
             screenshot_dir,
             show_indicator: !cli.no_indicator,
@@ -110,7 +137,7 @@ fn default_config_path() -> Option<PathBuf> {
 fn merge_keybindings_file(
     path: &Path,
     keybindings: &mut BTreeMap<KeyAction, Vec<u32>>,
-) -> Result<(), ConfigError> {
+) -> Result<Option<ScrollDirection>, ConfigError> {
     let path_text = path.display().to_string();
     let raw = std::fs::read_to_string(path).map_err(|err| ConfigError::ConfigFileRead {
         path: path_text.clone(),
@@ -121,17 +148,31 @@ fn merge_keybindings_file(
         message: err.to_string(),
     })?;
 
+    let mut file_scroll = None;
     for (option, _) in &table {
-        if option != KEYBINDINGS_SECTION {
-            return Err(ConfigError::UnknownConfigKey {
-                path: path_text.clone(),
-                value: option.clone(),
-            });
+        if option == KEYBINDINGS_SECTION || option == SCROLL_DIRECTION_OPTION {
+            continue;
         }
+        return Err(ConfigError::UnknownConfigKey {
+            path: path_text.clone(),
+            value: option.clone(),
+        });
+    }
+
+    if let Some(value) = table.get(SCROLL_DIRECTION_OPTION) {
+        let text = value.as_str().unwrap_or_default();
+        let parsed = ScrollDirection::parse(text);
+        let direction = parsed.ok_or_else(|| ConfigError::InvalidScrollDirection {
+            value: match value.as_str() {
+                Some(raw) => raw.to_owned(),
+                None => String::from("expected down or up"),
+            },
+        })?;
+        file_scroll = Some(direction);
     }
 
     let Some(bindings) = table.get(KEYBINDINGS_SECTION) else {
-        return Ok(());
+        return Ok(file_scroll);
     };
     let bindings = bindings
         .as_table()
@@ -181,7 +222,7 @@ fn merge_keybindings_file(
         keybindings.insert(action, codes);
     }
 
-    Ok(())
+    Ok(file_scroll)
 }
 
 fn parse_zoom(raw: &str) -> Result<f64, ConfigError> {
@@ -240,7 +281,7 @@ pub fn test_config() -> Config {
         keybindings: keymap::default_bindings(),
         initial_zoom: 0.0,
         output_filter: None,
-        invert_scroll: false,
+        scroll_direction: ScrollDirection::default(),
         spotlight: false,
         screenshot_dir: "shots".into(),
         show_indicator: true,
@@ -253,6 +294,7 @@ mod tests {
     use std::io::Write;
     use std::path::{Path, PathBuf};
 
+    use super::ScrollDirection;
     use super::{merge_keybindings_file, parse_zoom, resolve_screenshot_dir, test_config};
     use crate::error::ConfigError;
     use crate::keymap::{self, KeyAction};
@@ -387,15 +429,39 @@ close = "nope"
     }
 
     #[test]
+    fn merge_keybindings_rejects_non_string_values() {
+        let err = bindings_err("[keybindings]\nclose = 3");
+        assert!(matches!(err, ConfigError::KeyBindingValue { .. }));
+    }
+
+    #[test]
     fn merge_keybindings_rejects_unknown_option() {
-        let err = bindings_err("scroll_direction = \"up\"");
+        let err = bindings_err("not_a_real_option = \"up\"");
         assert!(matches!(err, ConfigError::UnknownConfigKey { .. }));
     }
 
     #[test]
-    fn merge_keybindings_rejects_non_string_values() {
-        let err = bindings_err("[keybindings]\nclose = 3");
-        assert!(matches!(err, ConfigError::KeyBindingValue { .. }));
+    fn merge_scroll_direction_rejects_invalid_value() {
+        let err = bindings_err("scroll_direction = \"sideways\"");
+        assert!(matches!(err, ConfigError::InvalidScrollDirection { .. }));
+
+        // sanity: valid values are accepted through the file merge.
+        assert_eq!(
+            scroll_from_file("scroll_direction = \"down\""),
+            Some(ScrollDirection::Down)
+        );
+        assert_eq!(
+            scroll_from_file("scroll_direction = \"up\""),
+            Some(ScrollDirection::Up)
+        );
+    }
+    #[track_caller]
+    fn scroll_from_file(contents: &str) -> Option<ScrollDirection> {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        file.write_all(contents.as_bytes()).unwrap();
+        file.flush().unwrap();
+        let mut keybindings = keymap::default_bindings();
+        merge_keybindings_file(file.path(), &mut keybindings).unwrap()
     }
 
     fn bindings_err(contents: &str) -> ConfigError {

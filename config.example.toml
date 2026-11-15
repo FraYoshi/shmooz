@@ -1,3 +1,5 @@
+# scroll_direction = "up"      # which wheel rotation zooms in (down|up, default down)
+
 # shmooz — Dvorak left half (ortho 4x6 + thumb). Values name the key as your
 # firmware sends it; comments say what the cap prints.
 

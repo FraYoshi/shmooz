@@ -49,7 +49,8 @@ shmooz [options...]
 * `--map-close KEY` - Set the close key
 * `--output NAME` - Use a specific output
 * `--zoom-in PERCENT` - Start zoomed in
-* `--invert-scroll` - Invert scroll direction
+* `--scroll-direction down|up` - Wheel rotation that zooms in (default: down)
+* `--invert-scroll` - Shorthand for `--scroll-direction up`
 * `--spotlight` - Start with spotlight enabled
 * `--screenshot-dir DIR` - Set the screenshot directory
 * `--no-indicator` - Hide the on-screen indicator
@@ -131,6 +132,8 @@ environment variable is unset); a different location can be passed with
 with a key name or an array of key names:
 
 ```toml
+scroll_direction = "up"      # wheel rotation that zooms in (default: down)
+
 [keybindings]
 close = "q"                # exit with Q instead of Esc
 zoom_in = ["equal", "kpadd"]   # zoom in with = or KP_Add

@@ -428,7 +428,7 @@ fn pointer_axis(state: &mut AppState, value: f64) {
     };
 
     let mut scroll = value / SCROLL_ZOOM_UNIT;
-    if state.config.invert_scroll {
+    if state.config.scroll_direction == crate::config::ScrollDirection::Up {
         scroll = -scroll;
     }
 

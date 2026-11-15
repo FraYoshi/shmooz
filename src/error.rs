@@ -69,6 +69,9 @@ pub enum ConfigError {
     #[error("unknown config option '{value}' in {path}")]
     UnknownConfigKey { path: String, value: String },
 
+    #[error("invalid scroll direction: {value} (expected down or up)")]
+    InvalidScrollDirection { value: String },
+
     #[error("unknown keybinding action: {value} (known actions: {known})")]
     KeyBindingAction { value: String, known: String },
 
