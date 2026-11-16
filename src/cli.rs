@@ -42,7 +42,21 @@ Controls:
 
   Global:
     Right click           Exit
-    Esc                   Exit from navigation by default";
+    Esc                   Exit from navigation by default
+
+Config File:
+  Path: $XDG_CONFIG_HOME/shmooz/config.toml, or --config PATH; strict TOML.
+  Top-level global options come before any table (e.g. scroll_direction = \"up\"
+  reverses the wheel so it zooms on the up rotation). Under [keybindings], each
+  action may be one key name or an array of names; [] disables an action.
+  See config.example.toml for the annotated complete reference.
+
+Accepted actions in [keybindings] (all built-in defaults shown there):
+    close, zoom_in, zoom_out, pan_left, pan_right, pan_up, pan_down,
+    reset_view, save_screenshot, toggle_spotlight, toggle_color_picker,
+    toggle_annotate_zoomed, toggle_annotate_unzoomed, tool_pen,
+    tool_highlighter, tool_line, tool_rectangle, tool_ellipse, tool_move,
+    tool_text, undo_annotation, clear_annotations, decrease_size, increase_size";
 
 #[derive(Debug, Clone, Parser)]
 #[command(
@@ -110,4 +124,20 @@ pub struct Cli {
 
     #[arg(long = "no-indicator", help = "Hide the zoom mode indicator badge")]
     pub no_indicator: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::keymap::KeyAction;
+
+    #[test]
+    fn help_epilog_lists_all_configurable_actions() {
+        for name in KeyAction::known_actions() {
+            assert!(
+                super::HELP_EPILOG.contains(name),
+                "help epilog missing action: {}",
+                name
+            );
+        }
+    }
 }

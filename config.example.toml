@@ -1,32 +1,52 @@
-# scroll_direction = "up"      # which wheel rotation zooms in (down|up, default down)
+# shmooz configuration — complete reference.
+#
+# Install to:	$XDG_CONFIG_HOME/shmooz/config.toml  (fallback: $HOME/.config/shmooz/config.toml)
+# Run with --help for controls and option help; values are strict TOML, one key per line.
+#
+# Each keybinding value is a key name (or an array of names). Names follow the
+# lowercase evdev/xkb naming that libinput reports: letters "a", punctuation
+# "=" "-" "[" "]" ";" ",", digits "1".."0" as words ("minus" for key labels
+# are fine too, e.g. both quote forms below work):
+#   single quote: "'" / "apostrophe"; space = "space"; arrows up/down/left/right; F1-F12;
+#   numpad "kpadd", "kp0", "kpenter"; modifiers cannot be bound alone? reserved see end.
+# An empty array disables a binding entirely: reset_view = [].
 
-# shmooz — Dvorak left half (ortho 4x6 + thumb). Values name the key as your
-# firmware sends it; comments say what the cap prints.
+scroll_direction = "down"  # wheel rotation that zooms in: down (default) | up
 
 [keybindings]
-close            = ["'", "esc"]  # apostrophe or your Esc column
-pan_left         = "j"
-pan_right        = "k"
-pan_up           = "u"
-pan_down         = "x"   # bottom-right x
+close                    = "esc"      # right click is always exit; Esc default here
+zoom_in                  = ["=", "kpadd"]
+zoom_out                 = ["-", "kpsubtract"]
+pan_left                 = "left"
+pan_right                = "right"
+pan_up                   = "up"
+pan_down                 = "down"
+reset_view               = ["0", "kp0"]   # restore/unzoom (double click too)
+save_screenshot          = "s"
+toggle_spotlight         = "f"            # dim screen outside pointer circle
+toggle_color_picker      = "i"            # click to copy hex color
+toggle_annotate_zoomed   = "d"            # draw while zoomed
+toggle_annotate_unzoomed = "w"            # draw without zooming
 
-zoom_in          = "p"   # plus
-zoom_out         = ","   # comma minus
-reset_view       = "."   # dot = origin
+tool_pen                 = "p"
+tool_highlighter         = "h"
+tool_line                = "l"
+tool_rectangle           = "r"
+tool_ellipse             = "e"
+tool_move                = "m"   # move existing annotations (left drag)
+tool_text                = "t"   # click to place text; Enter commits
 
-save_screenshot  = "y"   # yes-save
-toggle_spotlight = "space"     # thumb space
-toggle_color_picker = ";"      # semicolon: hex colors
-toggle_annotate_zoomed = "e"
-toggle_annotate_unzoomed = "a"
+undo_annotation          = "u"
+clear_annotations        = "c"
 
-undo_annotation  = "o"   # oops
-clear_annotations = "i"
+# annotation color palette and text size use reserved digits 1-0 minus/=/ [ / ]
+# while in any draw mode. increase/decrease_size:
+increase_size            = "]"
+decrease_size            = "["
 
-# tools by number row (digits are reserved for the color palette while
-# annotating; move/text stay on their defaults)
-tool_pen = "1"
-tool_highlighter = "2"
-tool_line = "3"
-tool_rectangle = "4"
-tool_ellipse = "5"
+# --- example: Dvorak on an ortho left-half (glovesora-style) -----------------
+# close = ["'", "esc"]
+# pan_left = "j"; pan_right = "k"; pan_up = "u"; pan_down = "x"  (split to lines)
+# zoom_in = "p"   plus key prints on this layout;  zoom_out = ","  comma-minus
+# reset_view = "."  zero/origin; save_screenshot = "y" yes; spotlight = "space"
+# color picker = ";" ; annotate draw e / unzoomed a ; undo o oops; clear i.

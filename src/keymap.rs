@@ -147,6 +147,26 @@ pub fn default_bindings() -> BTreeMap<KeyAction, Vec<u32>> {
 /// Resolves a key name (e.g. "minus", "KP_Add", "F1", "a") to an evdev key
 /// code.
 pub fn key_code(name: &str) -> Option<u32> {
+    // Literal single-character names (the printable ASCII forms of the keys)
+    // must be checked first: normalize() drops '-' etc. as word separators and
+    // would make the alias arms below dead code for these glyphs.
+    if let Some(code) = match name.trim() {
+        "-" => Some(12u32),
+        "=" | "+" => Some(13),
+        "[" | "{" => Some(26),
+        "]" | "}" => Some(27),
+        ";" => Some(39),
+        "'" => Some(40),
+        "`" => Some(41),
+        "," | "<" => Some(51),
+        "." | ">" => Some(52),
+        "/" | "?" => Some(53),
+        "\\" | "|" => Some(43),
+        _ => None,
+    } {
+        return Some(code);
+    }
+
     match normalize(name).as_str() {
         "esc" | "escape" => Some(1),
         "minus" | "-" => Some(12),
@@ -184,7 +204,6 @@ pub fn key_code(name: &str) -> Option<u32> {
         "bracketleft" | "leftbracket" | "[" => Some(26),
         "bracketright" | "rightbracket" | "]" => Some(27),
         "semicolon" | ";" => Some(39),
-        "'" | "apostrophe" | "quote" => Some(40),
         "grave" => Some(41),
         "backslash" => Some(43),
         "comma" | "," => Some(51),

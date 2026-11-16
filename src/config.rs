@@ -440,11 +440,19 @@ close = "nope"
         let mut keybindings = keymap::default_bindings();
         merge_keybindings_file(&path, &mut keybindings).expect("config.example.toml must parse");
 
-        // The example closes with apostrophe-or-Esc and pans on the Dvorak row.
-        let apostrophe = keymap::key_code("'").unwrap();
-        assert_eq!(keybindings[&KeyAction::Close], vec![apostrophe, 1]);
-        let j = keymap::key_code("j").unwrap();
-        assert_eq!(keybindings[&KeyAction::PanLeft], vec![j]); // home-row j
+        // The reference file lists the defaults verbatim.
+        assert_eq!(keybindings[&KeyAction::Close], vec![1]);
+        assert_eq!(
+            keybindings[&KeyAction::ZoomIn],
+            vec![
+                keymap::key_code("=").unwrap(),
+                keymap::key_code("kpadd").unwrap()
+            ]
+        );
+        assert_eq!(
+            keybindings[&KeyAction::PanLeft],
+            vec![keymap::key_code("left").unwrap()]
+        );
     }
 
     #[test]
