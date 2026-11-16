@@ -59,6 +59,11 @@ impl InteractionMode {
     ) -> BadgeModel {
         let k = |a| Self::badge_keys(keys, a);
         let combo = |acts: &[crate::keymap::KeyAction]| Self::badge_combo(keys, acts);
+        let palette_hint = if Self::palette_shadowed(keys) {
+            String::new()
+        } else {
+            String::from("1-0-= color  ")
+        };
         let text_height = text_scale.max(1) * TEXT_GLYPH_HEIGHT;
         match self {
             Self::Navigate => {
@@ -138,7 +143,22 @@ impl InteractionMode {
                             ),
                             0xFFF4_F4F4,
                         ),
-                        BadgeLine::new("STYLE", "1-0-= color  [ ] size  U/C", annotation_color),
+                        BadgeLine::new(
+                            "STYLE",
+                            palette_hint.clone()
+                                + &format!(
+                                    "{} size  {}/{}/{}/{}",
+                                    combo(&[
+                                        crate::keymap::KeyAction::DecreaseSize,
+                                        crate::keymap::KeyAction::IncreaseSize,
+                                    ]),
+                                    k(crate::keymap::KeyAction::ToolMove),
+                                    k(crate::keymap::KeyAction::ToolText),
+                                    k(crate::keymap::KeyAction::UndoAnnotation),
+                                    k(crate::keymap::KeyAction::ClearAnnotations),
+                                ),
+                            annotation_color,
+                        ),
                     ],
                 },
                 AnnotationTool::Text => BadgeModel {
@@ -149,16 +169,18 @@ impl InteractionMode {
                         BadgeLine::new("TEXT", "Type  Bksp delete  Enter  Esc", 0xFFF4_F4F4),
                         BadgeLine::new(
                             "STYLE",
-                            format!(
-                                "1-0-= color  {} size  {}/{}/{}",
-                                combo(&[
-                                    crate::keymap::KeyAction::DecreaseSize,
-                                    crate::keymap::KeyAction::IncreaseSize,
-                                ]),
-                                k(crate::keymap::KeyAction::ToolMove),
-                                k(crate::keymap::KeyAction::UndoAnnotation),
-                                k(crate::keymap::KeyAction::ClearAnnotations),
-                            ),
+                            palette_hint.clone()
+                                + &format!(
+                                    "{} size  {}/{}/{}/{}",
+                                    combo(&[
+                                        crate::keymap::KeyAction::DecreaseSize,
+                                        crate::keymap::KeyAction::IncreaseSize,
+                                    ]),
+                                    k(crate::keymap::KeyAction::ToolMove),
+                                    k(crate::keymap::KeyAction::ToolText),
+                                    k(crate::keymap::KeyAction::UndoAnnotation),
+                                    k(crate::keymap::KeyAction::ClearAnnotations),
+                                ),
                             annotation_color,
                         ),
                     ],
@@ -186,17 +208,18 @@ impl InteractionMode {
                         ),
                         BadgeLine::new(
                             "STYLE",
-                            format!(
-                                "1-0-= color  {} size  {}/{}/{}/{}",
-                                combo(&[
-                                    crate::keymap::KeyAction::DecreaseSize,
-                                    crate::keymap::KeyAction::IncreaseSize,
-                                ]),
-                                k(crate::keymap::KeyAction::ToolMove),
-                                k(crate::keymap::KeyAction::ToolText),
-                                k(crate::keymap::KeyAction::UndoAnnotation),
-                                k(crate::keymap::KeyAction::ClearAnnotations),
-                            ),
+                            palette_hint.clone()
+                                + &format!(
+                                    "{} size  {}/{}/{}/{}",
+                                    combo(&[
+                                        crate::keymap::KeyAction::DecreaseSize,
+                                        crate::keymap::KeyAction::IncreaseSize,
+                                    ]),
+                                    k(crate::keymap::KeyAction::ToolMove),
+                                    k(crate::keymap::KeyAction::ToolText),
+                                    k(crate::keymap::KeyAction::UndoAnnotation),
+                                    k(crate::keymap::KeyAction::ClearAnnotations),
+                                ),
                             annotation_color,
                         ),
                     ],
@@ -213,6 +236,16 @@ impl InteractionMode {
         }
     }
 
+    pub(crate) fn palette_shadowed(
+        bindings: &std::collections::BTreeMap<crate::keymap::KeyAction, Vec<u32>>,
+    ) -> bool {
+        bindings
+            .values()
+            .flatten()
+            .any(|code| (2u32..=13).contains(code))
+    }
+
+    ///
     /// Compact glyph display for badge lines: single characters verboard, a
     /// capital first letter of multi-character names (Left->L).
     pub(crate) fn badge_short(codes: &[u32]) -> String {
@@ -866,7 +899,7 @@ impl AppState {
             ],
         );
 
-        let annotation = HelpSection::new(
+        let mut annotation = HelpSection::new(
             "ANNOTATION",
             vec![
                 (
@@ -918,6 +951,9 @@ impl AppState {
                 (String::from("Esc"), String::from("Back")),
             ],
         );
+        if InteractionMode::palette_shadowed(&self.config.keybindings) {
+            annotation.rows.retain(|(k, _)| k != "~~PALETTE~~");
+        }
 
         let global = HelpSection::new(
             "GLOBAL",

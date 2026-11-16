@@ -1463,6 +1463,21 @@ mod tests {
     }
 
     #[test]
+    fn palette_shortcut_follows_remap_precedence_rules() {
+        use crate::{config, keymap::KeyAction};
+
+        // Explicit binding on a palette digit wins: key_action sees the action...
+        let mut cfg = config::test_config();
+        let mut bound = cfg.keybindings.clone();
+        bound.insert(KeyAction::ToolPen, vec![KEY_1]);
+        cfg.keybindings = bound;
+        assert_eq!(cfg.key_action(KEY_1), Some(KeyAction::ToolPen));
+
+        // ...and unbound digit still resolves via palette index lookup.
+        assert_eq!(super::palette_index_for_key(KEY_3), Some(2));
+    }
+
+    #[test]
     fn plain_c_does_not_become_copy_shortcut_without_ctrl() {
         let state = AppState::new(test_config());
 
