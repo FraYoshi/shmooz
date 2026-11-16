@@ -514,6 +514,8 @@ fn handle_key_event(state: &mut AppState, key: u32, key_state: wl_keyboard::KeyS
             state.repeat_key = Some(key);
             state.repeat_deadline = Some(Instant::now() + KEY_REPEAT_DELAY);
         }
+    } else {
+        tracing::trace!(key_code = key, "key has no binding here");
     }
 }
 
