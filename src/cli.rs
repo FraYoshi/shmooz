@@ -123,6 +123,12 @@ pub struct Cli {
     )]
     pub screenshot_dir: Option<String>,
 
+    #[arg(
+        long = "list-keys",
+        help = "Print the resolved keybindings (config + CLI applied), then exit without starting"
+    )]
+    pub list_keys: bool,
+
     #[arg(long = "no-indicator", help = "Hide the zoom mode indicator badge")]
     pub no_indicator: bool,
 }

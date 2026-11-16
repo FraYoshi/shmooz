@@ -50,7 +50,8 @@ shmooz [options...]
 * `--output NAME` - Use a specific output
 * `--zoom-in PERCENT` - Start zoomed in
 * First run offers a quick keymap layout choice (qwerty or dvorak)
-* `--scroll-direction down|up` - Wheel rotation that zooms in (built-in default: up)
+* `--scroll-direction down|up`
+* `--list-keys` prints the resolved keybindings (helpful when keys look bound twice) and exits - Wheel rotation that zooms in (built-in default: up)
 * `--invert-scroll` - Legacy shorthand, same as the new default
 * `--spotlight` - Start with spotlight enabled
 * `--screenshot-dir DIR` - Set the screenshot directory

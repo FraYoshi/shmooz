@@ -31,8 +31,18 @@ pub fn init_tracing() {
 
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
+    let list_keys = cli.list_keys;
+    let source_text = match cli.config.clone() {
+        Some(path) => path,
+        None => String::from("$XDG_CONFIG_HOME/shmooz/config.toml (default location)"),
+    };
     crate::config::maybe_first_run_layout(cli.config.as_deref());
     let config = Config::try_from(cli)?;
+    if list_keys {
+        println!("# shmooz resolved keybindings, source: {source_text}");
+        crate::config::print_keybindings(&config);
+        return Ok(());
+    }
     let mut context = WaylandContext::connect(config)?;
     log_selected_outputs(&context.state)?;
 

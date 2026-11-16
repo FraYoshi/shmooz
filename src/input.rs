@@ -1155,6 +1155,12 @@ fn apply_annotation_palette_shortcut(state: &mut AppState, key: u32) -> bool {
         return false;
     }
 
+    // Reserved palette only claims otherwise-unclaimed codes: explicit user
+    // bindings (tools on the number row!) must win and get dispatched below.
+    if state.config.key_action(key).is_some() {
+        return false;
+    }
+
     let Some(index) = palette_index_for_key(key) else {
         return false;
     };
@@ -1300,8 +1306,8 @@ mod tests {
     use super::{
         AnnotationPoint, AnnotationTool, AppState, InteractionMode, KEY_1, KEY_3, KEY_C, KEY_ESC,
         KEY_I, KEY_L, KEY_M, KEY_RIGHTBRACE, KEY_T, apply_annotation_palette_index,
-        ctrl_modifier_active, current_text_input, handle_key_event, is_copy_screenshot_shortcut,
-        select_annotation_tool,
+        apply_annotation_palette_shortcut, ctrl_modifier_active, current_text_input,
+        handle_key_event, is_copy_screenshot_shortcut, select_annotation_tool,
     };
 
     fn ctrl_pressed_state() -> AppState {
@@ -1475,6 +1481,26 @@ mod tests {
 
         // ...and unbound digit still resolves via palette index lookup.
         assert_eq!(super::palette_index_for_key(KEY_3), Some(2));
+    }
+
+    #[test]
+    fn reserved_palette_prefers_bindings_and_defaults() {
+        use crate::{config, keymap};
+
+        // Dvorak preset: tool_line lives on KEY_3 -> palette must NOT touch it.
+        let mut cfg = config::test_config();
+        cfg.keybindings = keymap::default_bindings_layout(keymap::Layout::Dvorak);
+        let mut state = AppState::new(cfg);
+        state.interaction_mode = InteractionMode::AnnotateZoomed;
+        let before = state.annotation_color_index;
+        assert!(!apply_annotation_palette_shortcut(&mut state, KEY_3));
+        assert_eq!(state.annotation_color_index, before);
+
+        // Classic defaults: digits free -> same key recolors via palette.
+        let mut classic_state = AppState::new(config::test_config());
+        classic_state.interaction_mode = InteractionMode::AnnotateZoomed;
+        assert!(apply_annotation_palette_shortcut(&mut classic_state, KEY_3));
+        assert_eq!(classic_state.annotation_color_index, 2);
     }
 
     #[test]

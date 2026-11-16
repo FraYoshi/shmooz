@@ -387,6 +387,38 @@ pub fn test_config() -> Config {
     }
 }
 
+/// Print the resolved action -> key table (used by --list-keys). One pair per
+/// line so downstream tools or humans can grep their suspect keys easily.
+pub fn print_keybindings(config: &Config) {
+    let direction = match config.scroll_direction {
+        ScrollDirection::Down => "down",
+        ScrollDirection::Up => "up",
+    };
+    println!("# scroll_direction = \"{direction}\"");
+
+    let mut entries: Vec<(String, String)> = config
+        .keybindings
+        .iter()
+        .map(|(action, codes)| {
+            let keys = codes
+                .iter()
+                .map(|code| keymap::key_label(*code).to_owned())
+                .collect::<Vec<_>>()
+                .join(",");
+            let value = if keys.is_empty() {
+                String::from("(disabled)")
+            } else {
+                keys
+            };
+            (format!("{action:?}"), value)
+        })
+        .collect();
+    entries.sort();
+    for (name, keys) in entries {
+        println!("{name} = {keys}");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
