@@ -44,8 +44,8 @@ clear_annotations        = "c"
 
 # annotation color palette and text size use reserved digits 1-0 minus/=/ [ / ]
 # while in any draw mode. increase/decrease_size:
-increase_size            = "]"
-decrease_size            = "["
+increase_size            = "\\"
+decrease_size            = "/"
 
 # --- example: Dvorak on an ortho left-half (glovesora-style) -----------------
 # close = ["'", "esc"]

@@ -435,8 +435,8 @@ pub fn default_bindings_dvorak() -> BTreeMap<KeyAction, Vec<u32>> {
         ("tool_text", &["t"]),
         ("undo_annotation", &["o"]),
         ("clear_annotations", &["i"]),
-        ("decrease_size", &["["]),
-        ("increase_size", &["]"]),
+        ("decrease_size", &["/"]),
+        ("increase_size", &["\\"]),
     ];
 
     let mut map = BTreeMap::new();
