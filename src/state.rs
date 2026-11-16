@@ -55,7 +55,10 @@ impl InteractionMode {
         text_scale: usize,
         close_label: String,
         spotlight_radius_pct: Option<u32>,
+        keys: &std::collections::BTreeMap<crate::keymap::KeyAction, Vec<u32>>,
     ) -> BadgeModel {
+        let k = |a| Self::badge_keys(keys, a);
+        let combo = |acts: &[crate::keymap::KeyAction]| Self::badge_combo(keys, acts);
         let text_height = text_scale.max(1) * TEXT_GLYPH_HEIGHT;
         match self {
             Self::Navigate => {
@@ -67,11 +70,39 @@ impl InteractionMode {
                     title: "NAVIGATE".to_owned(),
                     subtitle,
                     lines: [
-                        BadgeLine::new("MODE", "D draw  W draw no zoom", 0xFFFF_C83D),
-                        BadgeLine::new("VIEW", "+/- zoom  arrows pan  0 reset", 0xFFF4_F4F4),
+                        BadgeLine::new(
+                            "MODE",
+                            format!(
+                                "{} draw  {} draw no zoom",
+                                k(crate::keymap::KeyAction::ToggleAnnotateZoomed),
+                                k(crate::keymap::KeyAction::ToggleAnnotateUnzoomed),
+                            ),
+                            0xFFFF_C83D,
+                        ),
+                        BadgeLine::new(
+                            "VIEW",
+                            format!(
+                                "{} zoom  {} pan  {} reset",
+                                combo(&[
+                                    crate::keymap::KeyAction::ZoomIn,
+                                    crate::keymap::KeyAction::ZoomOut,
+                                ]),
+                                combo(&[
+                                    crate::keymap::KeyAction::PanLeft,
+                                    crate::keymap::KeyAction::PanRight,
+                                    crate::keymap::KeyAction::PanUp,
+                                    crate::keymap::KeyAction::PanDown,
+                                ]),
+                                k(crate::keymap::KeyAction::ResetView),
+                            ),
+                            0xFFF4_F4F4,
+                        ),
                         BadgeLine::new(
                             "OTHER",
-                            format!("S save  Ctrl+C  ? help  {close_label} close"),
+                            format!(
+                                "{} save  Ctrl+C  ? help  {close_label} close",
+                                k(crate::keymap::KeyAction::SaveScreenshot),
+                            ),
                             0xFFF4_F4F4,
                         ),
                     ],
@@ -92,7 +123,21 @@ impl InteractionMode {
                     subtitle: format!("Modifier: MOVE  Size: {text_height}px"),
                     lines: [
                         BadgeLine::new("DRAG", "Drag existing annotation", 0xFFFF_C83D),
-                        BadgeLine::new("NEXT", "P/H/L/R/E draw  T text  Esc", 0xFFF4_F4F4),
+                        BadgeLine::new(
+                            "NEXT",
+                            format!(
+                                "{} draw  {} text  Esc",
+                                combo(&[
+                                    crate::keymap::KeyAction::ToolPen,
+                                    crate::keymap::KeyAction::ToolHighlighter,
+                                    crate::keymap::KeyAction::ToolLine,
+                                    crate::keymap::KeyAction::ToolRectangle,
+                                    crate::keymap::KeyAction::ToolEllipse,
+                                ]),
+                                k(crate::keymap::KeyAction::ToolText),
+                            ),
+                            0xFFF4_F4F4,
+                        ),
                         BadgeLine::new("STYLE", "1-0-= color  [ ] size  U/C", annotation_color),
                     ],
                 },
@@ -102,7 +147,20 @@ impl InteractionMode {
                     lines: [
                         BadgeLine::new("PLACE", "Click to place text", 0xFFFF_C83D),
                         BadgeLine::new("TEXT", "Type  Bksp delete  Enter  Esc", 0xFFF4_F4F4),
-                        BadgeLine::new("STYLE", "1-0-= color  [ ] size  M/U/C", annotation_color),
+                        BadgeLine::new(
+                            "STYLE",
+                            format!(
+                                "1-0-= color  {} size  {}/{}/{}",
+                                combo(&[
+                                    crate::keymap::KeyAction::DecreaseSize,
+                                    crate::keymap::KeyAction::IncreaseSize,
+                                ]),
+                                k(crate::keymap::KeyAction::ToolMove),
+                                k(crate::keymap::KeyAction::UndoAnnotation),
+                                k(crate::keymap::KeyAction::ClearAnnotations),
+                            ),
+                            annotation_color,
+                        ),
                     ],
                 },
                 _ => BadgeModel {
@@ -110,8 +168,37 @@ impl InteractionMode {
                     subtitle: format!("Tool: {}  Size: {text_height}px", tool.label()),
                     lines: [
                         BadgeLine::new("DRAG", "Drag to draw", 0xFFFF_C83D),
-                        BadgeLine::new("TOOL", "P/H paint  L/R/E shape  Esc", 0xFFF4_F4F4),
-                        BadgeLine::new("STYLE", "1-0-= color  [ ] size  M/T/U/C", annotation_color),
+                        BadgeLine::new(
+                            "TOOL",
+                            format!(
+                                "{} paint  {} shape  Esc",
+                                combo(&[
+                                    crate::keymap::KeyAction::ToolPen,
+                                    crate::keymap::KeyAction::ToolHighlighter,
+                                ]),
+                                combo(&[
+                                    crate::keymap::KeyAction::ToolLine,
+                                    crate::keymap::KeyAction::ToolRectangle,
+                                    crate::keymap::KeyAction::ToolEllipse,
+                                ]),
+                            ),
+                            0xFFF4_F4F4,
+                        ),
+                        BadgeLine::new(
+                            "STYLE",
+                            format!(
+                                "1-0-= color  {} size  {}/{}/{}/{}",
+                                combo(&[
+                                    crate::keymap::KeyAction::DecreaseSize,
+                                    crate::keymap::KeyAction::IncreaseSize,
+                                ]),
+                                k(crate::keymap::KeyAction::ToolMove),
+                                k(crate::keymap::KeyAction::ToolText),
+                                k(crate::keymap::KeyAction::UndoAnnotation),
+                                k(crate::keymap::KeyAction::ClearAnnotations),
+                            ),
+                            annotation_color,
+                        ),
                     ],
                 },
             },
@@ -124,6 +211,44 @@ impl InteractionMode {
             Self::AnnotateUnzoomed => "DRAW NO ZOOM",
             Self::Navigate | Self::ColorPicker => "NAVIGATE",
         }
+    }
+
+    /// Compact glyph display for badge lines: single characters verboard, a
+    /// capital first letter of multi-character names (Left->L).
+    pub(crate) fn badge_short(codes: &[u32]) -> String {
+        match codes.first() {
+            Some(code) => {
+                let label = crate::keymap::key_label(*code);
+                let mut it = label.chars();
+                match (it.next(), it.next()) {
+                    (Some(one), None) => one.to_uppercase().to_string(),
+                    (Some(first), _) => first.to_uppercase().collect(),
+                    _ => String::from("?"),
+                }
+            }
+            None => String::from("(none)"),
+        }
+    }
+
+    pub(crate) fn badge_keys(
+        bindings: &std::collections::BTreeMap<crate::keymap::KeyAction, Vec<u32>>,
+        action: crate::keymap::KeyAction,
+    ) -> String {
+        bindings
+            .get(&action)
+            .map(|c| Self::badge_short(c))
+            .unwrap_or_else(|| String::from("?"))
+    }
+
+    pub(crate) fn badge_combo(
+        bindings: &std::collections::BTreeMap<crate::keymap::KeyAction, Vec<u32>>,
+        actions: &[crate::keymap::KeyAction],
+    ) -> String {
+        actions
+            .iter()
+            .map(|a| Self::badge_keys(bindings, *a))
+            .collect::<Vec<_>>()
+            .join("/")
     }
 }
 
@@ -1056,6 +1181,51 @@ mod tests {
     }
 
     #[test]
+    fn badge_and_help_follow_custom_bindings() {
+        use crate::config;
+        let mut cfg = config::test_config();
+        cfg.keybindings = crate::keymap::default_bindings_layout(crate::keymap::Layout::Dvorak);
+
+        let nav_badge = InteractionMode::Navigate.badge(
+            AnnotationTool::Pen,
+            ANNOTATION_COLOR_PALETTE[0],
+            4,
+            String::from("Esc"),
+            None,
+            &cfg.keybindings,
+        );
+        // E is the Dvorak "draw zoomed" key; J/K/U/X the pan row.
+        assert!(
+            nav_badge.lines[0].text.starts_with("E draw"),
+            "{}",
+            nav_badge.lines[0].text
+        );
+        assert!(
+            nav_badge.lines[1].text.contains("J/K/U/X"),
+            "{}",
+            nav_badge.lines[1].text
+        );
+
+        // help card must carry live glyphs, not built-in defaults:
+        let state = AppState::new(cfg);
+        let model = state.help_model();
+        let joined = model
+            .two_cols
+            .iter()
+            .flatten()
+            .chain(model.three_cols.iter().flatten())
+            .map(|s| {
+                s.rows
+                    .iter()
+                    .map(|(k, _)| k.clone())
+                    .collect::<Vec<_>>()
+                    .join("")
+            })
+            .collect::<String>();
+        assert!(joined.contains('E'), "no live glyph in help model");
+    }
+
+    #[test]
     fn navigate_badge_shows_draw_modes() {
         let badge = InteractionMode::Navigate.badge(
             AnnotationTool::Pen,
@@ -1063,6 +1233,7 @@ mod tests {
             4,
             String::from("Esc"),
             None,
+            &crate::config::test_config().keybindings,
         );
 
         assert_eq!(badge.subtitle, "View controls and quick entry points");
@@ -1078,6 +1249,7 @@ mod tests {
             4,
             String::from("Q"),
             None,
+            &crate::config::test_config().keybindings,
         );
 
         assert_eq!(badge.lines[2].text, "S save  Ctrl+C  ? help  Q close");
@@ -1091,6 +1263,7 @@ mod tests {
             4,
             String::from("Esc"),
             None,
+            &crate::config::test_config().keybindings,
         );
 
         assert!(badge.lines[1].text.contains("Esc"));
