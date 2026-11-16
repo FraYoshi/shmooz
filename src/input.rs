@@ -597,8 +597,8 @@ fn apply_key_action(state: &mut AppState, action: KeyAction) {
         KeyAction::ToolMove | KeyAction::ToolText => {}
         KeyAction::UndoAnnotation => undo_annotation(state),
         KeyAction::ClearAnnotations => clear_annotations(state),
-        KeyAction::DecreaseSize if annotating => adjust_annotation_text_scale(state, -1),
-        KeyAction::IncreaseSize if annotating => adjust_annotation_text_scale(state, 1),
+        KeyAction::DecreaseSize if annotating => resize_annotation(state, -1),
+        KeyAction::IncreaseSize if annotating => resize_annotation(state, 1),
         KeyAction::ZoomIn
         | KeyAction::ZoomOut
         | KeyAction::PanLeft
@@ -736,6 +736,7 @@ fn start_annotation(state: &mut AppState, output_id: u32, tool: AnnotationTool) 
         screen_to_annotation_point(state, output_id, window.pointer_x, window.pointer_y)
     });
     let color = state.annotation_color_for(tool);
+    let stroke_px = state.annotation_stroke_px(tool);
 
     let Some(point) = point else {
         return;
@@ -743,7 +744,7 @@ fn start_annotation(state: &mut AppState, output_id: u32, tool: AnnotationTool) 
 
     if let Some(window) = state.windows.get_mut(&output_id) {
         window.pointer_pressed = true;
-        window.active_annotation = Some(ActiveAnnotation::new(tool, point, color));
+        window.active_annotation = Some(ActiveAnnotation::new(tool, point, color, stroke_px));
         window.active_move = None;
     }
     overlay::update_annotation_overlays(state);
@@ -1212,6 +1213,41 @@ fn palette_index_for_key(key: u32) -> Option<usize> {
         .then(|| (key - KEY_1) as usize)
 }
 
+/// Size keys target whichever thing makes sense: active text height during
+/// typing, otherwise future (and the in-progress preview's) pen stroke width.
+fn resize_annotation(state: &mut AppState, delta: i32) {
+    let typing_text = state
+        .windows
+        .values()
+        .any(|window| window.active_text.is_some());
+    if typing_text {
+        adjust_annotation_text_scale(state, delta);
+        return;
+    }
+
+    if !state.adjust_annotation_stroke(delta) {
+        return;
+    }
+
+    let stroke_px = state.annotation_stroke_px(state.effective_annotation_tool());
+    let mut refreshed_outputs = Vec::new();
+    for (output_id, window) in &mut state.windows {
+        let Some(active_annotation) = &mut window.active_annotation else {
+            continue;
+        };
+        match active_annotation {
+            ActiveAnnotation::Stroke(stroke) => stroke.width = stroke_px.max(1),
+            ActiveAnnotation::Shape(shape) => shape.width = stroke_px.max(1),
+        }
+        refreshed_outputs.push(*output_id);
+    }
+
+    overlay::refresh_zoom_badge_overlays(state);
+    for output_id in refreshed_outputs {
+        overlay::refresh_annotation_overlay(state, output_id);
+    }
+}
+
 fn adjust_annotation_text_scale(state: &mut AppState, delta: i32) {
     if !state.adjust_text_annotation_scale(delta) {
         return;
@@ -1305,7 +1341,7 @@ mod tests {
 
     use super::{
         AnnotationPoint, AnnotationTool, AppState, InteractionMode, KEY_1, KEY_3, KEY_C, KEY_ESC,
-        KEY_I, KEY_L, KEY_M, KEY_RIGHTBRACE, KEY_T, apply_annotation_palette_index,
+        KEY_I, KEY_L, KEY_LEFTBRACE, KEY_M, KEY_RIGHTBRACE, KEY_T, apply_annotation_palette_index,
         apply_annotation_palette_shortcut, ctrl_modifier_active, current_text_input,
         handle_key_event, is_copy_screenshot_shortcut, select_annotation_tool,
     };
@@ -1527,6 +1563,7 @@ mod tests {
             AnnotationTool::Pen,
             AnnotationPoint { x: 10, y: 20 },
             ANNOTATION_COLOR_PALETTE[0],
+            4,
         );
         let mut state = AppState::new(test_config());
 
@@ -1547,7 +1584,7 @@ mod tests {
     }
 
     #[test]
-    fn text_size_shortcuts_adjust_default_text_scale_in_draw_mode() {
+    fn size_shortcuts_nudge_stroke_width_instead_of_hidden_text_default() {
         let mut state = AppState::new(test_config());
         state.interaction_mode = InteractionMode::AnnotateZoomed;
 
@@ -1558,9 +1595,19 @@ mod tests {
             0,
         );
 
-        assert_eq!(
-            state.text_annotation_scale,
-            DEFAULT_TEXT_ANNOTATION_SCALE + 1
+        // v0.4 semantics: while drawing (nothing typing), [ ] change pen thickness
+        // going forward instead of mutating the invisible default text scale...
+        assert_eq!(state.annotation_stroke_adjustment, 1);
+        assert_eq!(state.text_annotation_scale, DEFAULT_TEXT_ANNOTATION_SCALE);
+
+        // ...still clamped to sane minimum widths/heights:
+        for _ in 0..40 {
+            handle_key_event(&mut state, KEY_LEFTBRACE, wl_keyboard::KeyState::Pressed, 0);
+        }
+        assert_eq!(state.annotation_stroke_adjustment, -4);
+        assert!(
+            AppState::new(test_config()).annotation_stroke_px(crate::state::AnnotationTool::Pen)
+                >= 1
         );
     }
 

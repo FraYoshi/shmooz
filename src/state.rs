@@ -513,19 +513,19 @@ pub enum ActiveAnnotation {
 }
 
 impl ActiveAnnotation {
-    pub fn new(tool: AnnotationTool, point: AnnotationPoint, color: u32) -> Self {
+    pub fn new(tool: AnnotationTool, point: AnnotationPoint, color: u32, stroke_px: usize) -> Self {
         match tool.shape_kind() {
             Some(kind) => Self::Shape(ShapeAnnotation {
                 kind,
                 start: point,
                 end: point,
                 color,
-                width: tool.stroke_width(),
+                width: stroke_px.max(1),
             }),
             None => Self::Stroke(StrokeAnnotation {
                 points: vec![point],
                 color,
-                width: tool.stroke_width(),
+                width: stroke_px.max(1),
             }),
         }
     }
@@ -793,6 +793,7 @@ pub struct AppState {
     pub interaction_mode: InteractionMode,
     pub annotation_tool: AnnotationTool,
     pub annotation_color_index: usize,
+    pub annotation_stroke_adjustment: i32,
     pub text_annotation_scale: usize,
     pub tool_override: Option<AnnotationTool>,
     pub color_picker_copied: bool,
@@ -997,6 +998,7 @@ impl AppState {
             interaction_mode: InteractionMode::default(),
             annotation_tool: AnnotationTool::default(),
             annotation_color_index: 0,
+            annotation_stroke_adjustment: 0,
             text_annotation_scale: DEFAULT_TEXT_ANNOTATION_SCALE,
             tool_override: None,
             color_picker_copied: false,
@@ -1088,6 +1090,21 @@ impl AppState {
             return false;
         }
         self.annotation_color_index = index;
+        true
+    }
+
+    /// Effective pen/shape thickness for a tool after user's size-key nudges.
+    pub fn annotation_stroke_px(&self, tool: AnnotationTool) -> usize {
+        (tool.stroke_width() as i32 + self.annotation_stroke_adjustment).max(1) as usize
+    }
+
+    /// Size keys nudge future stroke thickness when nothing else to grow.
+    pub fn adjust_annotation_stroke(&mut self, delta: i32) -> bool {
+        let next = (self.annotation_stroke_adjustment + delta).clamp(-4, 40);
+        if next == self.annotation_stroke_adjustment {
+            return false;
+        }
+        self.annotation_stroke_adjustment = next;
         true
     }
 
@@ -1194,6 +1211,7 @@ mod tests {
             AnnotationTool::Rectangle,
             AnnotationPoint { x: 20, y: 30 },
             ANNOTATION_COLOR_PALETTE[0],
+            4,
         );
 
         annotation.recolor(ANNOTATION_COLOR_PALETTE[3]);
