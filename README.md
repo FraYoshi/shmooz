@@ -1,3 +1,8 @@
+> [!NOTE]
+> This repository is a fork of the original [`shmooz`](https://github.com/chmouel/shmooz) project.
+> The reason behind was the lack of keyboard customization on the original project
+> The custom keybindings feature was created with the aid of `qwen3.8-flash-next` at `iq4_xs`.
+
 # `shmooz`
 
 Zoom, annotate, and capture the current Wayland view.
