@@ -388,6 +388,7 @@ fn refresh_zoom_badge_overlay(state: &mut AppState, output_id: u32) {
         state.selected_palette_color(),
         state.text_annotation_scale,
         state.config.close_label(),
+        state.annotation_stroke_px(state.effective_annotation_tool()),
         spotlight_radius_pct,
         &state.config.keybindings,
     );

@@ -1520,6 +1520,25 @@ mod tests {
     }
 
     #[test]
+    fn size_action_from_remapped_slash_key_reaches_stroke_nudge() {
+        let mut cfg = crate::config::test_config();
+        let slash = crate::keymap::key_code("/").expect("slash key code");
+        let mut kb = cfg.keybindings.clone();
+        kb.insert(crate::keymap::KeyAction::DecreaseSize, vec![slash]);
+        cfg.keybindings = kb;
+
+        let mut state = AppState::new(cfg);
+        state.interaction_mode = InteractionMode::AnnotateZoomed;
+
+        assert_eq!(
+            state.config.key_action(slash),
+            Some(crate::keymap::KeyAction::DecreaseSize)
+        );
+        super::apply_key_action(&mut state, crate::keymap::KeyAction::DecreaseSize);
+        assert_eq!(state.annotation_stroke_adjustment, -1);
+    }
+
+    #[test]
     fn reserved_palette_prefers_bindings_and_defaults() {
         use crate::{config, keymap};
 

@@ -48,12 +48,14 @@ impl InteractionMode {
         matches!(self, Self::AnnotateZoomed | Self::AnnotateUnzoomed)
     }
 
+    #[allow(clippy::too_many_arguments)] // assembled display model params; see callers
     pub fn badge(
         self,
         tool: AnnotationTool,
         annotation_color: u32,
         text_scale: usize,
         close_label: String,
+        stroke_px: usize,
         spotlight_radius_pct: Option<u32>,
         keys: &std::collections::BTreeMap<crate::keymap::KeyAction, Vec<u32>>,
     ) -> BadgeModel {
@@ -147,7 +149,7 @@ impl InteractionMode {
                             "STYLE",
                             palette_hint.clone()
                                 + &format!(
-                                    "{} size  {}/{}/{}/{}",
+                                    "{} size  {}/{}/{}/{} ({}px)",
                                     combo(&[
                                         crate::keymap::KeyAction::DecreaseSize,
                                         crate::keymap::KeyAction::IncreaseSize,
@@ -156,6 +158,7 @@ impl InteractionMode {
                                     k(crate::keymap::KeyAction::ToolText),
                                     k(crate::keymap::KeyAction::UndoAnnotation),
                                     k(crate::keymap::KeyAction::ClearAnnotations),
+                                    stroke_px,
                                 ),
                             annotation_color,
                         ),
@@ -171,7 +174,7 @@ impl InteractionMode {
                             "STYLE",
                             palette_hint.clone()
                                 + &format!(
-                                    "{} size  {}/{}/{}/{}",
+                                    "{} size  {}/{}/{}/{} ({}px)",
                                     combo(&[
                                         crate::keymap::KeyAction::DecreaseSize,
                                         crate::keymap::KeyAction::IncreaseSize,
@@ -180,6 +183,7 @@ impl InteractionMode {
                                     k(crate::keymap::KeyAction::ToolText),
                                     k(crate::keymap::KeyAction::UndoAnnotation),
                                     k(crate::keymap::KeyAction::ClearAnnotations),
+                                    stroke_px,
                                 ),
                             annotation_color,
                         ),
@@ -210,7 +214,7 @@ impl InteractionMode {
                             "STYLE",
                             palette_hint.clone()
                                 + &format!(
-                                    "{} size  {}/{}/{}/{}",
+                                    "{} size  {}/{}/{}/{} ({}px)",
                                     combo(&[
                                         crate::keymap::KeyAction::DecreaseSize,
                                         crate::keymap::KeyAction::IncreaseSize,
@@ -219,6 +223,7 @@ impl InteractionMode {
                                     k(crate::keymap::KeyAction::ToolText),
                                     k(crate::keymap::KeyAction::UndoAnnotation),
                                     k(crate::keymap::KeyAction::ClearAnnotations),
+                                    stroke_px,
                                 ),
                             annotation_color,
                         ),
@@ -1245,6 +1250,7 @@ mod tests {
             ANNOTATION_COLOR_PALETTE[0],
             4,
             String::from("Esc"),
+            4,
             None,
             &cfg.keybindings,
         );
@@ -1286,6 +1292,7 @@ mod tests {
             ANNOTATION_COLOR_PALETTE[0],
             4,
             String::from("Esc"),
+            4,
             None,
             &crate::config::test_config().keybindings,
         );
@@ -1302,6 +1309,7 @@ mod tests {
             ANNOTATION_COLOR_PALETTE[0],
             4,
             String::from("Q"),
+            4,
             None,
             &crate::config::test_config().keybindings,
         );
@@ -1316,12 +1324,17 @@ mod tests {
             ANNOTATION_COLOR_PALETTE[0],
             4,
             String::from("Esc"),
+            4,
             None,
             &crate::config::test_config().keybindings,
         );
 
         assert!(badge.lines[1].text.contains("Esc"));
-        assert!(badge.lines[2].text.contains("U/C"));
+        assert!(
+            badge.lines[2].text.contains("U/C (4px)"),
+            "{}",
+            badge.lines[2].text
+        );
     }
 
     #[test]
