@@ -11,7 +11,10 @@
 #   numpad "kpadd", "kp0", "kpenter"; modifiers cannot be bound alone? reserved see end.
 # An empty array disables a binding entirely: reset_view = [].
 
-scroll_direction = "down"  # wheel rotation that zooms in: down (default) | up
+# Built-in keymap preset selectable also interactively on first run:
+# qwerty (classic v0.3) or dvorak (left-half ortho preset, built-in default).
+layout = "dvorak"
+scroll_direction = "down"  # wheel rotation that zooms in: down | up
 
 [keybindings]
 close                    = "esc"      # right click is always exit; Esc default here

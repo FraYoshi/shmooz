@@ -484,17 +484,16 @@ impl<'a> Canvas<'a> {
     }
 
     fn draw_help_section(&mut self, x: usize, y: usize, section: &HelpSection) {
-        let (heading, entries) = *section;
         self.draw_label(
             x as i32,
             y as i32,
-            heading,
+            &section.heading,
             HELP_HEADING_SCALE,
             HELP_HEADING_COLOR,
         );
 
         let mut row_y = y + HELP_HEADING_HEIGHT + HELP_ROW_GAP * 2;
-        for (key, desc) in entries {
+        for (key, desc) in &section.rows {
             self.draw_label(x as i32, row_y as i32, key, HELP_TEXT_SCALE, HELP_KEY_COLOR);
             self.draw_label(
                 (x + HELP_KEY_COLUMN_WIDTH) as i32,
@@ -549,89 +548,54 @@ const HELP_SECTION_WIDTH: usize = HELP_KEY_COLUMN_WIDTH + 18 * TEXT_GLYPH_ADVANC
 const HELP_COLUMN_GAP: usize = 4 * TEXT_GLYPH_ADVANCE * HELP_TEXT_SCALE;
 const HELP_PADDING: usize = 36;
 
-type HelpSection = (&'static str, &'static [(&'static str, &'static str)]);
-
-const HELP_NAVIGATION: HelpSection = (
-    "NAVIGATION",
-    &[
-        ("Scroll", "Zoom at pointer"),
-        ("Shift+Drag", "Box zoom area"),
-        ("Drag", "Pan"),
-        ("+/-", "Zoom center"),
-        ("Arrows", "Pan"),
-        ("0", "Reset view"),
-        ("f", "Spotlight"),
-        ("[ ]", "Spotlight size"),
-        ("Dbl click", "Reset view"),
-        ("Right click", "Exit"),
-    ],
-);
-
-const HELP_COLOR_PICKER: HelpSection = (
-    "COLOR PICKER",
-    &[
-        ("i", "Toggle picker"),
-        ("Move", "Update swatch"),
-        ("Left click", "Copy hex"),
-        ("Esc", "Leave picker"),
-    ],
-);
-
-const HELP_ANNOTATION: HelpSection = (
-    "ANNOTATION",
-    &[
-        ("d", "Draw zoomed"),
-        ("w", "Draw full view"),
-        ("p/h/l/r/e", "Tools"),
-        ("t", "Text mode"),
-        ("m", "Move mode"),
-        ("Drag", "Draw or move"),
-        ("Click", "Place text"),
-        ("1-0 - =", "Select color"),
-        ("[ ]", "Text size"),
-        ("Enter", "Commit text"),
-        ("Backspace", "Delete char"),
-        ("u", "Undo"),
-        ("c", "Clear"),
-        ("Esc", "Back"),
-    ],
-);
-
-const HELP_GLOBAL: HelpSection = (
-    "GLOBAL",
-    &[
-        ("s", "Save screenshot"),
-        ("Ctrl+C", "Copy to clipboard"),
-        ("?", "This help"),
-    ],
-);
-
-const HELP_THREE_COLUMNS: &[&[HelpSection]] = &[
-    &[HELP_NAVIGATION, HELP_GLOBAL],
-    &[HELP_COLOR_PICKER],
-    &[HELP_ANNOTATION],
-];
-
-const HELP_TWO_COLUMNS: &[&[HelpSection]] = &[
-    &[HELP_NAVIGATION, HELP_COLOR_PICKER],
-    &[HELP_ANNOTATION, HELP_GLOBAL],
-];
-
-fn help_section_height((_, entries): &HelpSection) -> usize {
-    HELP_HEADING_HEIGHT + HELP_ROW_GAP * 2 + entries.len() * (HELP_ROW_HEIGHT + HELP_ROW_GAP)
+/// One visible block in the help overlay (owned data, built from live config).
+#[derive(Debug, Clone)]
+pub struct HelpSection {
+    pub heading: String,
+    pub rows: Vec<(String, String)>,
 }
 
-pub fn paint_help_overlay(pixels: &mut [u8], width: usize, height: usize, close_label: &str) {
+impl HelpSection {
+    pub fn new(heading: &str, rows: Vec<(String, String)>) -> Self {
+        Self {
+            heading: heading.to_owned(),
+            rows,
+        }
+    }
+}
+
+/// Both supported column layouts, built once per display.
+#[derive(Debug, Clone)]
+pub struct HelpModel {
+    pub two_cols: [Vec<HelpSection>; 2],
+    pub three_cols: [Vec<HelpSection>; 3],
+}
+
+// (static shortcut tables removed: dynamic model lives in state.rs);
+
+/// Compute the height of one help section card row-block.
+fn help_section_height(section: &HelpSection) -> usize {
+    HELP_HEADING_HEIGHT + HELP_ROW_GAP * 2 + section.rows.len() * (HELP_ROW_HEIGHT + HELP_ROW_GAP)
+}
+
+pub fn paint_help_overlay(
+    pixels: &mut [u8],
+    width: usize,
+    height: usize,
+    close_label: &str,
+    model: &HelpModel,
+) {
     let mut canvas = Canvas::new(pixels, width, height);
     canvas.pixels.fill(0xCC10_1018);
 
     let pad = HELP_PADDING;
     let columns_width =
         |count: usize| HELP_SECTION_WIDTH * count + HELP_COLUMN_GAP * (count - 1) + pad * 2;
-    let columns = if width >= columns_width(3) + 80 {
-        HELP_THREE_COLUMNS
+    let wide = width >= columns_width(3) + 80;
+    let columns: &[Vec<HelpSection>] = if wide {
+        &model.three_cols
     } else {
-        HELP_TWO_COLUMNS
+        &model.two_cols
     };
 
     let title_h = TEXT_GLYPH_HEIGHT * HELP_TITLE_SCALE;
@@ -686,7 +650,6 @@ pub fn paint_help_overlay(pixels: &mut [u8], width: usize, height: usize, close_
         HELP_DIM_COLOR,
     );
 }
-
 fn lookup_glyph(ch: char) -> Option<&'static [u8; TEXT_GLYPH_HEIGHT]> {
     match ch {
         'A' => Some(&[0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11]),

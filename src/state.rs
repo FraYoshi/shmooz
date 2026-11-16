@@ -664,6 +664,159 @@ pub struct ToastState {
 }
 
 impl AppState {
+    /// Build the on-screen keyboard shortcuts card from the *actual* configured
+    /// bindings (previously it printed only built-in defaults and lied about
+    /// customised keys). Mouse-only gestures stay static; every key row shows
+    /// the live binding(s), including Dvorak/QWERTY presets, remaps, arrays.
+    pub fn help_model(&self) -> crate::render::HelpModel {
+        use crate::{keymap, render::HelpSection};
+
+        let label = |action: keymap::KeyAction| -> String {
+            match self.config.keybindings.get(&action) {
+                Some(codes) if !codes.is_empty() => codes
+                    .iter()
+                    .map(|c| keymap::key_label(*c))
+                    .collect::<Vec<_>>()
+                    .join("/"),
+                _ => String::from("(disabled)"),
+            }
+        };
+        let multi = |actions: &[keymap::KeyAction]| -> String {
+            actions
+                .iter()
+                .map(|a| label(*a))
+                .collect::<Vec<_>>()
+                .join("/")
+        };
+
+        let nav = HelpSection::new(
+            "NAVIGATION",
+            vec![
+                (String::from("Scroll"), String::from("Zoom at pointer")),
+                (String::from("Shift+Drag"), String::from("Box zoom area")),
+                (String::from("Drag"), String::from("Pan")),
+                (
+                    multi(&[keymap::KeyAction::ZoomIn, keymap::KeyAction::ZoomOut]),
+                    String::from("Zoom center"),
+                ),
+                (
+                    multi(&[
+                        keymap::KeyAction::PanLeft,
+                        keymap::KeyAction::PanRight,
+                        keymap::KeyAction::PanUp,
+                        keymap::KeyAction::PanDown,
+                    ]),
+                    String::from("Pan view"),
+                ),
+                (
+                    label(keymap::KeyAction::ResetView),
+                    String::from("Reset view"),
+                ),
+                (
+                    label(keymap::KeyAction::ToggleSpotlight),
+                    String::from("Spotlight"),
+                ),
+                (
+                    multi(&[
+                        keymap::KeyAction::DecreaseSize,
+                        keymap::KeyAction::IncreaseSize,
+                    ]),
+                    String::from("Spotlight size"),
+                ),
+                (String::from("Dbl click"), String::from("Reset view")),
+                (String::from("Right click"), String::from("Exit")),
+            ],
+        );
+
+        let picker = HelpSection::new(
+            "COLOR PICKER",
+            vec![
+                (
+                    label(keymap::KeyAction::ToggleColorPicker),
+                    String::from("Toggle picker"),
+                ),
+                (String::from("Move"), String::from("Update swatch")),
+                (String::from("Left click"), String::from("Copy hex")),
+                (String::from("Esc"), String::from("Leave picker")),
+            ],
+        );
+
+        let annotation = HelpSection::new(
+            "ANNOTATION",
+            vec![
+                (
+                    label(keymap::KeyAction::ToggleAnnotateZoomed),
+                    String::from("Draw zoomed"),
+                ),
+                (
+                    label(keymap::KeyAction::ToggleAnnotateUnzoomed),
+                    String::from("Draw full view"),
+                ),
+                (
+                    multi(&[
+                        keymap::KeyAction::ToolPen,
+                        keymap::KeyAction::ToolHighlighter,
+                        keymap::KeyAction::ToolLine,
+                        keymap::KeyAction::ToolRectangle,
+                        keymap::KeyAction::ToolEllipse,
+                    ]),
+                    String::from("Tools pen/highl/rect/ellip"),
+                ),
+                (
+                    label(keymap::KeyAction::ToolText),
+                    String::from("Text mode"),
+                ),
+                (
+                    label(keymap::KeyAction::ToolMove),
+                    String::from("Move mode"),
+                ),
+                (String::from("Drag"), String::from("Draw or move")),
+                (String::from("Click"), String::from("Place text")),
+                (String::from("1-0 - ="), String::from("Select color")),
+                (
+                    multi(&[
+                        keymap::KeyAction::DecreaseSize,
+                        keymap::KeyAction::IncreaseSize,
+                    ]),
+                    String::from("Text size"),
+                ),
+                (String::from("Enter"), String::from("Commit text")),
+                (String::from("Backspace"), String::from("Delete char")),
+                (
+                    label(keymap::KeyAction::UndoAnnotation),
+                    String::from("Undo"),
+                ),
+                (
+                    label(keymap::KeyAction::ClearAnnotations),
+                    String::from("Clear"),
+                ),
+                (String::from("Esc"), String::from("Back")),
+            ],
+        );
+
+        let global = HelpSection::new(
+            "GLOBAL",
+            vec![
+                (
+                    label(keymap::KeyAction::SaveScreenshot),
+                    String::from("Save screenshot"),
+                ),
+                (String::from("Ctrl+C"), String::from("Copy to clipboard")),
+                (self.config.close_label(), String::from("Exit / close help")),
+                (String::from("?"), String::from("This help")),
+            ],
+        );
+
+        crate::render::HelpModel {
+            three_cols: [
+                vec![nav.clone(), global.clone()],
+                vec![picker.clone()],
+                vec![annotation.clone()],
+            ],
+            two_cols: [vec![nav, picker], vec![annotation, global]],
+        }
+    }
+
     pub fn new(config: Config) -> Self {
         let spotlight_enabled = config.spotlight;
         Self {

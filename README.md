@@ -49,6 +49,7 @@ shmooz [options...]
 * `--map-close KEY` - Set the close key
 * `--output NAME` - Use a specific output
 * `--zoom-in PERCENT` - Start zoomed in
+* First run offers a quick keymap layout choice (qwerty or dvorak)
 * `--scroll-direction down|up` - Wheel rotation that zooms in (built-in default: up)
 * `--invert-scroll` - Legacy shorthand, same as the new default
 * `--spotlight` - Start with spotlight enabled
@@ -132,6 +133,9 @@ environment variable is unset); a different location can be passed with
 with a key name or an array of key names:
 
 ```toml
+# built-in presets; also offered interactively on first run:
+layout = "dvorak"          # qwerty or dvorak (no setting = built-in dvorak preset)
+
 scroll_direction = "down"    # wheel rotation that zooms in (built-in default: up)
 
 [keybindings]

@@ -69,6 +69,9 @@ pub enum ConfigError {
     #[error("unknown config option '{value}' in {path}")]
     UnknownConfigKey { path: String, value: String },
 
+    #[error("invalid keymap layout: {value} (expected qwerty or dvorak)")]
+    InvalidLayout { value: String },
+
     #[error("invalid scroll direction: {value} (expected down or up)")]
     InvalidScrollDirection { value: String },
 

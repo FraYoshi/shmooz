@@ -112,8 +112,36 @@ impl KeyAction {
     }
 }
 
-/// Default key bindings, mirroring the upstream built-in keymap.
-pub fn default_bindings() -> BTreeMap<KeyAction, Vec<u32>> {
+/// Built-in keymap layout presets selectable at first run or in config.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Layout {
+    /// Classic upstream defaults (leftover from v0.3).
+    Qwerty,
+    /// Left-half Dvorak preset — default when no choice was made.
+    #[default]
+    Dvorak,
+}
+
+impl Layout {
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "qwerty" | "qw" | "classic" => Some(Self::Qwerty),
+            "dvorak" | "dv" | "left" => Some(Self::Dvorak),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Qwerty => "qwerty",
+            Self::Dvorak => "dvorak",
+        }
+    }
+}
+
+/// Default key bindings for the classic (v0.3) layout, mirroring the upstream
+/// built-in keymap.
+pub fn default_bindings_qwerty() -> BTreeMap<KeyAction, Vec<u32>> {
     [
         (KeyAction::Close, vec![1u32]),
         (KeyAction::ZoomIn, vec![13, 78]),
@@ -364,4 +392,62 @@ fn normalize(name: &str) -> String {
     name.trim()
         .to_ascii_lowercase()
         .replace([' ', '-', '_'], "")
+}
+
+/// Default key bindings for the classic v0.3 layout.
+#[allow(dead_code)] // alias of qwerty preset kept for tests
+pub fn default_bindings() -> BTreeMap<KeyAction, Vec<u32>> {
+    default_bindings_qwerty()
+}
+
+/// Resolve the binding table for a preset layout (Dvorak is the built-in
+/// default when the user never chose anything).
+pub fn default_bindings_layout(layout: Layout) -> BTreeMap<KeyAction, Vec<u32>> {
+    match layout {
+        Layout::Qwerty => default_bindings_qwerty(),
+        Layout::Dvorak => default_bindings_dvorak(),
+    }
+}
+
+/// Left-half Dvorak preset: the printable glyphs of an ortho left half with
+/// glove-sora firmware, bound to what that firmware sends per key.
+pub fn default_bindings_dvorak() -> BTreeMap<KeyAction, Vec<u32>> {
+    let named: &[(&str, &[&str])] = &[
+        ("close", &["'", "esc"]),
+        ("zoom_in", &["p"]),
+        ("zoom_out", &[","]),
+        ("pan_left", &["j"]),
+        ("pan_right", &["k"]),
+        ("pan_up", &["u"]),
+        ("pan_down", &["x"]),
+        ("reset_view", &["."]),
+        ("save_screenshot", &["y"]),
+        ("toggle_spotlight", &["space"]),
+        ("toggle_color_picker", &[";"]),
+        ("toggle_annotate_zoomed", &["e"]),
+        ("toggle_annotate_unzoomed", &["a"]),
+        ("tool_pen", &["1"]),
+        ("tool_highlighter", &["2"]),
+        ("tool_line", &["3"]),
+        ("tool_rectangle", &["4"]),
+        ("tool_ellipse", &["5"]),
+        ("tool_move", &["m"]),
+        ("tool_text", &["t"]),
+        ("undo_annotation", &["o"]),
+        ("clear_annotations", &["i"]),
+        ("decrease_size", &["["]),
+        ("increase_size", &["]"]),
+    ];
+
+    let mut map = BTreeMap::new();
+    for (action_name, keys) in named {
+        let action = KeyAction::from_config_name(action_name)
+            .expect("builtin dvorak preset action must exist");
+        let codes = keys
+            .iter()
+            .map(|name| key_code(name).expect("builtin dvorak preset key must exist"))
+            .collect();
+        map.insert(action, codes);
+    }
+    map
 }

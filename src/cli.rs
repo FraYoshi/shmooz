@@ -49,7 +49,8 @@ Config File:
   Top-level global options come before any table (e.g. scroll_direction = \"up\"
   reverses the wheel so it zooms on the up rotation). Under [keybindings], each
   action may be one key name or an array of names; [] disables an action.
-  See config.example.toml for the annotated complete reference.
+  The built-in keymap preset is dvorak; choose qwerty/dvorak on first run or
+via `layout = \"qwerty\"` at file scope. See config.example.toml for defaults.
 
 Accepted actions in [keybindings] (all built-in defaults shown there):
     close, zoom_in, zoom_out, pan_left, pan_right, pan_up, pan_down,

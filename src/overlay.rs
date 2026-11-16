@@ -460,8 +460,9 @@ fn update_help_overlay(state: &mut AppState, output_id: u32) {
     set_layer_visible(state, output_id, Layer::Help, show);
     if show {
         let close_label = state.config.close_label();
+        let model = state.help_model();
         paint_layer(state, output_id, Layer::Help, |pixels, width, height| {
-            render::paint_help_overlay(pixels, width, height, &close_label);
+            render::paint_help_overlay(pixels, width, height, &close_label, &model);
         });
     }
 }

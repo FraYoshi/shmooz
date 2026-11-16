@@ -31,6 +31,7 @@ pub fn init_tracing() {
 
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
+    crate::config::maybe_first_run_layout(cli.config.as_deref());
     let config = Config::try_from(cli)?;
     let mut context = WaylandContext::connect(config)?;
     log_selected_outputs(&context.state)?;

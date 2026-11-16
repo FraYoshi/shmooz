@@ -10,6 +10,7 @@ pub const CONFIG_DIRECTORY_ENV: &str = "XDG_CONFIG_HOME";
 pub const CONFIG_SUBPATH: &str = "shmooz/config.toml";
 pub const KEYBINDINGS_SECTION: &str = "keybindings";
 pub const SCROLL_DIRECTION_OPTION: &str = "scroll_direction";
+pub const LAYOUT_OPTION: &str = "layout";
 
 /// Which way the wheel must be pushed for a zoom in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -81,11 +82,11 @@ impl TryFrom<Cli> for Config {
             home_dir.as_deref(),
         )?;
 
-        let mut keybindings = keymap::default_bindings();
-        let mut file_scroll = None;
+        let mut file_only = std::collections::BTreeMap::new();
+        let mut loaded = LoadedFile::default();
         if let Some(path) = config_path(cli.config.as_deref()) {
             if path.is_file() {
-                file_scroll = merge_keybindings_file(&path, &mut keybindings)?;
+                loaded = merge_keybindings_file(&path, &mut file_only)?;
             } else if cli.config.is_some() {
                 return Err(ConfigError::ConfigFileMissing {
                     path: path.display().to_string(),
@@ -93,10 +94,17 @@ impl TryFrom<Cli> for Config {
             }
         }
 
+        let layout = loaded.layout.unwrap_or_default();
+        let mut keybindings = keymap::default_bindings_layout(layout);
+        for (action, codes) in file_only {
+            keybindings.insert(action, codes);
+        }
+
         if let Some(raw) = cli.map_close.as_deref() {
             let code = keymap::key_code(raw).ok_or_else(|| ConfigError::CloseKey {
                 value: raw.to_owned(),
             })?;
+            // map-close overrides every file and layout default
             keybindings.insert(KeyAction::Close, vec![code]);
         }
 
@@ -104,7 +112,7 @@ impl TryFrom<Cli> for Config {
             (Some(raw), _) => ScrollDirection::parse(raw)
                 .ok_or_else(|| ConfigError::InvalidScrollDirection { value: raw.clone() })?,
             (None, true) => ScrollDirection::Up,
-            (None, false) => file_scroll.unwrap_or_default(),
+            (None, false) => loaded.scroll.unwrap_or_default(),
         };
 
         Ok(Self {
@@ -136,10 +144,17 @@ fn default_config_path() -> Option<PathBuf> {
 /// Applies the [keybindings] section of a config file on top of the current
 /// bindings. Each action may be bound to a single key name or an array of
 /// key names; an empty array disables the action.
+/// Contents of a config file as it pertains to startup defaults.
+#[derive(Default)]
+struct LoadedFile {
+    scroll: Option<ScrollDirection>,
+    layout: Option<keymap::Layout>,
+}
+
 fn merge_keybindings_file(
     path: &Path,
     keybindings: &mut BTreeMap<KeyAction, Vec<u32>>,
-) -> Result<Option<ScrollDirection>, ConfigError> {
+) -> Result<LoadedFile, ConfigError> {
     let path_text = path.display().to_string();
     let raw = std::fs::read_to_string(path).map_err(|err| ConfigError::ConfigFileRead {
         path: path_text.clone(),
@@ -151,8 +166,12 @@ fn merge_keybindings_file(
     })?;
 
     let mut file_scroll = None;
+    let mut file_layout = None;
     for (option, _) in &table {
-        if option == KEYBINDINGS_SECTION || option == SCROLL_DIRECTION_OPTION {
+        if option == KEYBINDINGS_SECTION
+            || option == SCROLL_DIRECTION_OPTION
+            || option == LAYOUT_OPTION
+        {
             continue;
         }
         return Err(ConfigError::UnknownConfigKey {
@@ -173,8 +192,26 @@ fn merge_keybindings_file(
         file_scroll = Some(direction);
     }
 
+    if let Some(value) = table.get(LAYOUT_OPTION) {
+        let text = value.as_str().unwrap_or_default();
+        file_layout =
+            Some(
+                keymap::Layout::parse(text).ok_or_else(|| ConfigError::InvalidLayout {
+                    value: match value.as_str() {
+                        Some(raw) => raw.to_owned(),
+                        None => String::from("expected qwerty or dvorak"),
+                    },
+                })?,
+            );
+    }
+
+    let loaded = LoadedFile {
+        scroll: file_scroll,
+        layout: file_layout,
+    };
+
     let Some(bindings) = table.get(KEYBINDINGS_SECTION) else {
-        return Ok(file_scroll);
+        return Ok(loaded);
     };
     let bindings = bindings
         .as_table()
@@ -224,7 +261,7 @@ fn merge_keybindings_file(
         keybindings.insert(action, codes);
     }
 
-    Ok(file_scroll)
+    Ok(loaded)
 }
 
 fn parse_zoom(raw: &str) -> Result<f64, ConfigError> {
@@ -275,6 +312,66 @@ fn resolve_screenshot_dir(raw: &str, home_dir: Option<&Path>) -> Result<PathBuf,
     }
 
     Ok(PathBuf::from(trimmed))
+}
+
+/// First-run chooser: writes a starter config file with the selected keymap
+/// layout when the resolved config path does not exist yet. Runs only on an
+/// interactive terminal; non-tty launches silently keep the built-in default
+/// (Dvorak preset). An explicit --config target is honoured too (that is where
+/// users expect "save alongside config path").
+pub fn maybe_first_run_layout(cli_override: Option<&str>) {
+    use std::io::{IsTerminal, Write as _};
+
+    let Some(path) = config_path(cli_override) else {
+        return;
+    };
+    if path.exists() || !std::io::stdin().is_terminal() {
+        return; // configured before or non-interactive: keep built-in defaults
+    }
+
+    eprintln!(
+        "No shmooz config found at {}. Choose default keymap layout:",
+        path.display()
+    );
+    eprintln!("  [1] qwerty  classic v0.3 defaults (Esc, +/-, arrows, d/w/s/...)");
+    eprintln!("  [2] dvorak  left-half Dvorak preset (quote, j/k/u/x pan, p plus...)");
+    eprint!("Enter choice [1/2/qwerty/dvorak], empty = 2: ");
+    let _ = std::io::stderr().flush();
+
+    let mut choice = String::new();
+    if std::io::stdin().read_line(&mut choice).is_err() {
+        eprintln!(" (no input, keeping dvorak preset)");
+        return;
+    }
+
+    let layout = match choice.trim().to_ascii_lowercase().as_str() {
+        "" | "2" | "d" | "dv" | "dvorak" => keymap::Layout::Dvorak,
+        "1" | "q" | "qw" | "qwerty" | "classic" => keymap::Layout::Qwerty,
+        other => {
+            eprintln!(" unrecognized input \"{other}\", using dvorak preset");
+            keymap::Layout::Dvorak
+        }
+    };
+
+    let template = std::vec![
+        "# shmooz starter config (created on first run).",
+        "# Remap actions under [keybindings]; see the shipped example",
+        "# (config.example.toml) for every action name.",
+        &format!("layout = \"{}\"", layout.as_str()),
+        "",
+        "[keybindings]",
+        "# close = \"q\"   # try a line like this to change the exit key",
+    ]
+    .join("\n")
+        + "\n";
+
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match std::fs::write(&path, &template) {
+        Ok(()) => eprintln!("wrote {}", path.display()),
+        Err(err) => eprintln!("warning: could not write config {}: {err}", path.display()),
+    }
 }
 
 #[cfg(test)]
@@ -483,8 +580,61 @@ close = "nope"
         let mut file = tempfile::NamedTempFile::new().unwrap();
         file.write_all(contents.as_bytes()).unwrap();
         file.flush().unwrap();
-        let mut keybindings = keymap::default_bindings();
-        merge_keybindings_file(file.path(), &mut keybindings).unwrap()
+        let mut target = keymap::default_bindings();
+        merge_keybindings_file(file.path(), &mut target)
+            .unwrap()
+            .scroll
+    }
+
+    #[track_caller]
+    fn layout_from_file(contents: &str) -> Option<keymap::Layout> {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        file.write_all(contents.as_bytes()).unwrap();
+        file.flush().unwrap();
+        let mut target = keymap::default_bindings();
+        merge_keybindings_file(file.path(), &mut target)
+            .unwrap()
+            .layout
+    }
+
+    #[test]
+    fn layout_parses_from_known_names_only() {
+        use keymap::Layout;
+        assert_eq!(Layout::parse("qwerty"), Some(Layout::Qwerty));
+        assert_eq!(Layout::parse(" QWERTy "), Some(Layout::Qwerty));
+        assert_eq!(Layout::parse("dvorak"), Some(Layout::Dvorak));
+        assert_eq!(Layout::parse("azerty"), None);
+    }
+
+    #[test]
+    fn layout_from_file_accepts_qwerty_and_dvorak() {
+        use keymap::Layout;
+        assert_eq!(
+            layout_from_file("layout = \"qwerty\""),
+            Some(Layout::Qwerty)
+        );
+        assert_eq!(
+            layout_from_file("layout = \"dvorak\"\nscroll_direction = \"up\""),
+            Some(Layout::Dvorak)
+        );
+        let err = bindings_err("layout = 42");
+        assert!(matches!(err, ConfigError::InvalidLayout { .. }));
+    }
+
+    #[test]
+    fn builtin_dvorak_pis_default_when_choice_omitted() {
+        // The built-in fallback layout must be Dvorak (left half preset), not QWERTY.
+        let dv = keymap::default_bindings_layout(keymap::Layout::Dvorak);
+        assert_eq!(
+            dv[&KeyAction::Close],
+            vec![keymap::key_code("'").unwrap(), 1]
+        );
+        assert_eq!(
+            dv[&KeyAction::PanLeft],
+            vec![keymap::key_code("j").unwrap()]
+        );
+        // ...and config default_bindings() alias still means classic for tests.
+        assert_eq!(keymap::default_bindings()[&KeyAction::Close], vec![1]);
     }
 
     #[test]
