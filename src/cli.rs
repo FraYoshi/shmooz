@@ -98,14 +98,14 @@ pub struct Cli {
     #[arg(
         long = "scroll-direction",
         value_name = "DIRECTION",
-        help = "Which way to push the wheel to zoom in (down or up)"
+        help = "Wheel rotation that zooms in: down or up (built-in default: up)"
     )]
     pub scroll_direction: Option<String>,
 
     #[arg(
         long = "invert-scroll",
         conflicts_with = "scroll_direction",
-        help = "Invert scroll direction (shorthand for --scroll-direction up)"
+        help = "Legacy shorthand; now same as the built-in default (up). Use --scroll-direction instead"
     )]
     pub invert_scroll: bool,
 

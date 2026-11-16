@@ -14,8 +14,10 @@ pub const SCROLL_DIRECTION_OPTION: &str = "scroll_direction";
 /// Which way the wheel must be pushed for a zoom in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ScrollDirection {
-    #[default]
     Down,
+    /// Built-in default (since vNext): wheel up magnifies; use "down" to restore
+    /// the old behavior.
+    #[default]
     Up,
 }
 
@@ -483,6 +485,11 @@ close = "nope"
         file.flush().unwrap();
         let mut keybindings = keymap::default_bindings();
         merge_keybindings_file(file.path(), &mut keybindings).unwrap()
+    }
+
+    #[test]
+    fn default_scroll_zoom_is_up() {
+        assert_eq!(ScrollDirection::default(), ScrollDirection::Up);
     }
 
     fn bindings_err(contents: &str) -> ConfigError {
